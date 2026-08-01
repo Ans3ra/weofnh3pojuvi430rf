@@ -1,9 +1,17 @@
 /* Bump CACHE when you replace index.html so the phone picks up the new version. */
-const CACHE = "sched-v1";
+const CACHE = "sched-v2";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
+/* Cache each file independently. One missing file must NOT abort installation —
+   if it does, the worker never activates and the browser will not offer install. */
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.all(SHELL.map(u => c.add(u).catch(err => {
+        console.warn("[sw] could not cache", u, err);
+      }))))
+      .then(() => self.skipWaiting())
+  );
 });
 self.addEventListener("activate", e => {
   e.waitUntil(
@@ -12,10 +20,10 @@ self.addEventListener("activate", e => {
       .then(() => self.clients.claim())
   );
 });
-/* Network first, falling back to cache: you get updates when online,
-   and the app still opens with no signal. */
+/* Network first, falling back to cache: updates when online, still opens offline. */
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then(r => {
