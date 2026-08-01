@@ -484,6 +484,9 @@ main{flex:1;position:relative;overflow:hidden}
   <div class="eyebrow" style="margin-top:17px">DIAGNOSTICS</div>
   <button class="btn gh" id="mDiag">CHECK WHY INSTALL IS UNAVAILABLE</button>
   <div id="mDiagOut" style="display:none"></div>
+  <div class="eyebrow" style="margin-top:17px">RESCUE &#183; NO DOWNLOAD NEEDED</div>
+  <button class="btn pri" id="mRescue">BACK UP WITHOUT DOWNLOADING</button>
+  <p class="note">Use this if downloads fail. Copies or shares your data as text.</p>
   <div class="eyebrow" style="margin-top:17px">SPREADSHEET</div>
   <button class="btn" id="mXlsxOut">EXPORT WORKBOOK &#183; .XLSX</button>
   <button class="btn" id="mXlsxIn">IMPORT WORKBOOK</button>
@@ -509,6 +512,27 @@ main{flex:1;position:relative;overflow:hidden}
   <button class="btn pri" id="impGo">APPLY IMPORT</button>
   <button class="btn gh" id="impNo">CANCEL</button>
   <p class="note">Nothing is written until you apply. Undo still works afterwards.</p>
+</div>
+
+<!-- RESCUE -->
+<div class="sheet" id="shRescue"><div class="grab"></div>
+  <div class="sh"><b>BACK UP WITHOUT DOWNLOADING</b><button class="ico" id="rX">&#10005;</button></div>
+  <p class="note" style="margin-bottom:11px">Android's download manager can't always handle files made in the page.
+    These routes avoid it entirely.</p>
+  <button class="btn pri" id="rCopy">COPY BACKUP TO CLIPBOARD</button>
+  <p class="note">Then paste into an email to yourself, a note, or any cloud-synced document. That text
+    is a complete restore.</p>
+  <button class="btn" id="rShare">SHARE BACKUP AS A FILE</button>
+  <p class="note">Opens Android's share sheet — send to Drive, Keep, email, anywhere.</p>
+  <button class="btn gh" id="rShow">SHOW BACKUP AS TEXT</button>
+  <div class="fld" id="rTextWrap" style="display:none;margin-top:11px">
+    <label>SELECT ALL AND COPY</label>
+    <textarea id="rText" rows="7" style="font-family:var(--mono);font-size:10px"></textarea>
+  </div>
+  <div class="eyebrow" style="margin-top:18px">RESTORE FROM TEXT</div>
+  <div class="fld"><label>PASTE A BACKUP HERE</label>
+    <textarea id="rPaste" rows="4" placeholder='{"v":1,"items":[...' style="font-family:var(--mono);font-size:10px"></textarea></div>
+  <button class="btn no" id="rRestore">RESTORE FROM PASTED TEXT</button>
 </div>
 
 <!-- CONFIRM -->
@@ -1524,7 +1548,7 @@ const asBool=v=>{ const s=String(v==null?"":v).trim().toUpperCase();
 const daysStr=d=>!d||!d.length?"":d.length===7?"ALL":d.map(i=>DOW[i]).join(",");
 
 /* ---------- model -> workbook ---------- */
-function exportXlsx(){
+async function exportXlsx(){
   const rec=k=>S.items.filter(i=>i.kind===k&&!i.archived);
   const log=[["Date","Item","Kind","Planned Start","Planned Min","Actual Start","Actual Min","Status","ItemID"]];
   for(const d of Object.keys(S.inst).sort()) for(const b of S.inst[d])
@@ -1561,15 +1585,81 @@ function exportXlsx(){
       ...rec("appt").map(i=>[i.id,i.name,i.desc||"",i.date||"",min2hm(i.start),i.dur])]},
     {name:"Log",rows:log}
   ];
-  dl(buildXlsx(sheets),"sched-"+todayStr()+".xlsx");
+  await dl(buildXlsx(sheets),"sched-"+todayStr()+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag();
   toast("Workbook exported","go");
 }
-function dl(blob,name){
-  const u=URL.createObjectURL(blob), a=document.createElement("a");
-  a.href=u; a.download=name; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(u); a.remove(); },400);
+/* Android WebView cannot download blob: URLs — its download manager refuses them.
+   Try the share sheet first (works in WebView), then fall back to a real download. */
+async function dl(blob,name,mime){
+  try{
+    const f=new File([blob],name,{type:mime||blob.type||"application/octet-stream"});
+    if(navigator.canShare && navigator.canShare({files:[f]})){
+      await navigator.share({files:[f],title:name});
+      toast("Sent to share sheet","go");
+      return true;
+    }
+  }catch(e){
+    if(e && e.name==="AbortError"){ toast("Cancelled"); return false; }
+  }
+  try{
+    const u=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=u; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(u); a.remove(); },400);
+    return true;
+  }catch(e){
+    toast("Download blocked — use Rescue in the menu","no");
+    return false;
+  }
 }
+
+/* ---------- rescue: clipboard / share / plain text ---------- */
+function backupText(){ return JSON.stringify(S); }
+async function copyText(txt){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(txt); return true;
+    }
+  }catch(e){}
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok=document.execCommand("copy"); ta.remove(); return ok;
+  }catch(e){ return false; }
+}
+$("#mRescue").addEventListener("click",()=>{ $("#rTextWrap").style.display="none"; sheet("#shRescue"); });
+$("#rX").addEventListener("click",closeSheet);
+$("#rCopy").addEventListener("click",async()=>{
+  const t=backupText();
+  const ok=await copyText(t);
+  if(ok){ mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag();
+    toast("Copied "+Math.round(t.length/1024)+" KB — paste it somewhere safe","go"); }
+  else { $("#rText").value=t; $("#rTextWrap").style.display="block";
+    toast("Clipboard blocked — select the text below","no"); }
+});
+$("#rShare").addEventListener("click",async()=>{
+  const t=backupText();
+  const blob=new Blob([t],{type:"application/json"});
+  const ok=await dl(blob,"sched-snapshot-"+todayStr()+".json","application/json");
+  if(ok){ mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag(); }
+});
+$("#rShow").addEventListener("click",()=>{
+  $("#rText").value=backupText(); $("#rTextWrap").style.display="block";
+  setTimeout(()=>{ const ta=$("#rText"); ta.focus(); ta.select(); },60);
+});
+$("#rRestore").addEventListener("click",()=>{
+  const raw=$("#rPaste").value.trim();
+  if(!raw) return toast("Paste a backup first","no");
+  let o; try{ o=JSON.parse(raw); }catch(e){ return toast("That isn't valid backup text","no"); }
+  if(!o||!o.items) return toast("That isn't a SCHED backup","no");
+  ask("RESTORE FROM TEXT","Replaces everything currently in the app. Undo can still bring it back this session.",()=>{
+    mark(); S=o;
+    if(!S.cfg) S.cfg=JSON.parse(JSON.stringify(FRESH.cfg));
+    for(const k in FRESH.cfg) if(S.cfg[k]===undefined) S.cfg[k]=FRESH.cfg[k];
+    _earliest=null; closeSheet(); commit(); toast("Restored","go");
+  });
+});
 
 /* ---------- workbook -> model ---------- */
 /* field-order-independent signature, so "updated" means actually changed */
@@ -1672,8 +1762,8 @@ $("#impNo").addEventListener("click",()=>{ pendingImport=null; closeSheet(); });
 $("#iX").addEventListener("click",()=>{ pendingImport=null; closeSheet(); });
 
 /* ---------- json snapshot ---------- */
-function exportJson(){
-  dl(new Blob([JSON.stringify(S)],{type:"application/json"}),"sched-snapshot-"+todayStr()+".json");
+async function exportJson(){
+  await dl(new Blob([JSON.stringify(S)],{type:"application/json"}),"sched-snapshot-"+todayStr()+".json","application/json");
   mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag();
   toast("Snapshot saved","go");
 }
