@@ -2,15 +2,15 @@
   "name": "SCHED",
   "short_name": "SCHED",
   "description": "Time-block schedule with habit streaks and an Excel round trip.",
-  "start_url": "/REPONAME/index.html",
-  "scope": "/REPONAME/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0d0f11",
   "theme_color": "#0d0f11",
   "icons": [
-    { "src": "/REPONAME/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/REPONAME/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/REPONAME/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
