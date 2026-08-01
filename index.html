@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0d0f11">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SCHED</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#0d0f11; --panel:#14171b; --panel2:#191d22; --raise:#1f242b;
+  --line:#232a32; --line-soft:#1a1f25; --line-hard:#414c59;
+  --fg:#ccd4dd; --dim:#7d8793; --faint:#4c555f;
+  --amber:#e8b04b; --red:#e0574f; --green:#4fa96d;
+  --amber-d:rgba(232,176,75,.13); --red-d:rgba(224,87,79,.13); --green-d:rgba(79,169,109,.13);
+  --blk:rgba(190,208,228,.055); --blk-2:rgba(190,208,228,.10); --blk-3:rgba(190,208,228,.16);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --hdr:52px; --bar:46px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--mono);
+  font-size:13px; line-height:1.4; -webkit-font-smoothing:antialiased;
+  user-select:none; display:flex; flex-direction:column;
+}
+button,input,select,textarea{font:inherit;color:inherit;background:none;border:none;outline:none}
+button{cursor:pointer}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ---------- chrome ---------- */
+#hdr{
+  height:calc(var(--hdr) + var(--sat)); padding:var(--sat) 10px 0;
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  background:var(--panel); border-bottom:1px solid var(--line); position:relative; z-index:40;
+}
+#hdr .stamp{font-size:11px;letter-spacing:.14em;color:var(--faint);flex:0 0 auto}
+#hdr .ctx{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;cursor:pointer}
+#hdr .ctx b{font-size:14px;font-weight:600;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hdr .ctx i{font-style:normal;font-size:10px;color:var(--dim);letter-spacing:.1em}
+.ico{
+  width:33px;height:33px;flex:0 0 auto;display:grid;place-items:center;
+  border:1px solid var(--line);border-radius:3px;background:var(--panel2);
+  font-size:12px;color:var(--dim);transition:.12s;
+}
+.ico:active{background:var(--raise);color:var(--fg)}
+.ico[disabled]{opacity:.3}
+.ico.on{border-color:var(--line-hard);color:var(--fg);background:var(--raise)}
+
+#nav{
+  height:calc(var(--bar) + var(--sab)); padding-bottom:var(--sab);
+  display:flex; flex:0 0 auto; background:var(--panel);
+  border-top:1px solid var(--line); position:relative; z-index:40;
+}
+#nav button{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:9px;letter-spacing:.13em;color:var(--faint);border-top:2px solid transparent;
+}
+#nav button .g{font-size:15px;line-height:1;font-family:var(--sans)}
+#nav button.on{color:var(--fg);border-top-color:var(--amber)}
+
+main{flex:1;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:none;overflow-y:auto;overscroll-behavior:contain}
+.view.on{display:block}
+.pad{padding:14px 12px calc(28px + var(--sab))}
+
+/* ---------- generic bits ---------- */
+.eyebrow{
+  font-size:9.5px;letter-spacing:.2em;color:var(--faint);
+  display:flex;align-items:center;gap:8px;margin:0 0 9px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+.empty{
+  border:1px dashed var(--line);border-radius:4px;padding:20px 16px;text-align:center;
+  color:var(--faint);font-size:11.5px;line-height:1.7;
+}
+.empty b{display:block;color:var(--dim);font-size:12px;margin-bottom:4px;letter-spacing:.06em}
+.tag{
+  font-size:8.5px;letter-spacing:.14em;padding:2px 5px;border-radius:2px;
+  border:1px solid var(--line);color:var(--faint);flex:0 0 auto;
+}
+.tag.hab{color:var(--amber);border-color:rgba(232,176,75,.3)}
+.tag.fix{color:var(--dim)}
+.tag.tsk{color:#6fa8d0;border-color:rgba(111,168,208,.3)}
+.tag.apt{color:#a98fd0;border-color:rgba(169,143,208,.3)}
+.tag.red{color:var(--red);border-color:rgba(224,87,79,.35)}
+
+/* ---------- streaks ---------- */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;
+  padding:11px 12px;margin-bottom:8px;
+}
+.card.due{border-left:2px solid var(--amber)}
+.card.allq{border-left:2px solid var(--green)}
+.crow{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.crow .nm{font-family:var(--sans);font-size:14px;font-weight:600;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+.crow .big{font-size:19px;font-weight:700;color:var(--amber);letter-spacing:-.02em}
+.crow .big.zero{color:var(--faint)}
+.crow .sub{font-size:9px;color:var(--faint);letter-spacing:.1em}
+.grid30{display:flex;gap:2.5px;margin-bottom:8px}
+.grid30 span{flex:1;height:15px;border-radius:1px;background:var(--line-soft);border:1px solid transparent}
+.grid30 span.d{background:var(--green);opacity:.85}
+.grid30 span.m{background:var(--red-d);border-color:rgba(224,87,79,.4)}
+.grid30 span.s{background:var(--line);border:1px dashed var(--faint)}
+.grid30 span.t{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber-d)}
+.grid30 span.n{background:transparent;border:1px solid var(--line-soft)}
+.cfoot{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--faint)}
+.cfoot .push{flex:1}
+.mini{
+  border:1px solid var(--line);border-radius:3px;padding:4px 9px;font-size:10px;
+  letter-spacing:.09em;color:var(--dim);background:var(--panel2);
+}
+.mini:active{background:var(--raise)}
+.mini.go{border-color:rgba(79,169,109,.45);color:var(--green)}
+.mini.no{border-color:rgba(224,87,79,.4);color:var(--red)}
+.mini.am{border-color:rgba(232,176,75,.45);color:var(--amber)}
+
+.hero{
+  border:1px solid var(--line);border-radius:4px;background:var(--panel);
+  padding:13px;margin-bottom:14px;display:flex;gap:11px;align-items:center;
+}
+.hero .num{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.hero .num.ok{color:var(--green)} .hero .num.mid{color:var(--amber)} .hero .num.lo{color:var(--dim)}
+.hero .txt{flex:1;min-width:0}
+.hero .txt b{display:block;font-size:12px;letter-spacing:.04em;font-weight:600}
+.hero .txt i{font-style:normal;display:block;font-size:10px;color:var(--faint);letter-spacing:.07em;margin-top:2px}
+
+/* ---------- day timeline ---------- */
+#dayWrap{position:absolute;inset:0;display:flex;flex-direction:column}
+#dayTools{
+  flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:7px 11px;
+  background:var(--panel2);border-bottom:1px solid var(--line);
+}
+#dayTools .zl{font-size:9px;letter-spacing:.14em;color:var(--faint);flex:0 0 auto}
+#zoom{flex:1;-webkit-appearance:none;height:22px;background:none}
+#zoom::-webkit-slider-runnable-track{height:2px;background:var(--line-hard);border-radius:2px}
+#zoom::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--amber);margin-top:-6.5px;border:2px solid var(--bg)}
+#zoom::-moz-range-track{height:2px;background:var(--line-hard)}
+#zoom::-moz-range-thumb{width:13px;height:13px;border:2px solid var(--bg);border-radius:50%;background:var(--amber)}
+#scroller{flex:1;overflow-y:auto;overscroll-behavior:contain;position:relative;touch-action:pan-y}
+#canvas{position:relative;margin-left:46px}
+.hr{position:absolute;left:0;right:0;border-top:1px solid var(--line-soft);pointer-events:none}
+.hr.q{border-top-style:dotted;opacity:.5}
+.hlab{
+  position:absolute;left:-46px;width:42px;text-align:right;font-size:9.5px;color:var(--faint);
+  transform:translateY(-50%);letter-spacing:.04em;pointer-events:none;
+}
+#nowline{position:absolute;left:-46px;right:0;height:0;z-index:16;pointer-events:none}
+#nowline::before{
+  content:"";position:absolute;left:46px;right:0;top:-1px;height:0;
+  border-top:1px solid var(--amber);opacity:.75;
+}
+#nowline .np{
+  position:absolute;left:0;top:-8px;width:42px;text-align:right;font-size:9px;
+  color:var(--bg);background:var(--amber);border-radius:2px;padding:1px 3px;
+  font-weight:700;letter-spacing:.03em;
+}
+
+.blk{
+  position:absolute;border-radius:3px;overflow:hidden;
+  background:var(--blk);border:1px dotted var(--line-hard);
+  padding:3px 6px;min-height:15px;transition:background .12s;
+}
+.blk .bh{
+  display:flex;align-items:center;gap:5px;font-family:var(--sans);
+  font-size:11.5px;font-weight:600;letter-spacing:.01em;line-height:1.25;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.blk .bt{font-family:var(--mono);font-size:8.5px;color:var(--faint);letter-spacing:.05em;margin-top:1px}
+.blk.tiny{padding:1px 5px;display:flex;align-items:center}
+.blk.tiny .bh{font-size:10px} .blk.tiny .bt{display:none}
+.blk .dot{width:5px;height:5px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.blk[data-t=habit] .dot{background:var(--amber)}
+.blk[data-t=task] .dot{background:#6fa8d0}
+.blk[data-t=appt] .dot{background:#a98fd0}
+.blk .fill{position:absolute;inset:-1px;border:1px solid #93a0af;border-radius:3px;
+  pointer-events:none;clip-path:inset(0 0 100% 0)}
+.blk.past{background:var(--blk-2)}
+.blk.done{border-style:solid;border-width:1.5px;border-color:var(--green);background:var(--green-d)}
+.blk.done .fill{display:none}
+.blk.done .bh{color:#d6f0e0}
+.blk.miss{border-style:solid;border-width:1.5px;border-color:var(--red);background:var(--red-d)}
+.blk.miss .fill{display:none}
+.blk.miss::after{content:"";position:absolute;inset:0;background:var(--red-d);pointer-events:none}
+.blk.miss .bh{color:#f6ded9;position:relative;z-index:1}
+.blk.dl{border-color:var(--red)}
+.blk.sel{box-shadow:0 0 0 2px var(--amber),0 3px 12px rgba(0,0,0,.55);z-index:14}
+.blk.drag{opacity:.9;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+.blk.skip{opacity:.45}
+.blk.skip .bh{text-decoration:line-through}
+.hnd{position:absolute;left:0;right:0;height:13px;z-index:3}
+.hnd.t{top:-4px} .hnd.b{bottom:-4px}
+.hnd::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:22px;height:2px;
+  background:var(--line-hard);border-radius:2px;opacity:0}
+.blk.sel .hnd::after{opacity:1}
+.blk.sel .hnd.t::after{top:5px} .blk.sel .hnd.b::after{bottom:5px}
+.dlmk{position:absolute;left:-46px;right:0;height:0;z-index:15;pointer-events:none}
+.dlmk::before{content:"";position:absolute;left:46px;right:0;top:0;border-top:1px dashed var(--red);opacity:.8}
+.dlmk span{position:absolute;left:46px;top:-13px;font-size:8px;color:var(--red);
+  letter-spacing:.11em;background:var(--bg);padding:0 4px}
+.gap{position:absolute;left:0;right:0;background:var(--green-d);border:1px dashed var(--green);
+  border-radius:3px;z-index:2;display:grid;place-items:center;font-size:9px;
+  color:var(--green);letter-spacing:.11em}
+
+/* ---------- week / month ---------- */
+.wk{display:flex;gap:5px;height:230px;margin-bottom:5px}
+.wkc{flex:1;position:relative;background:var(--panel);border:1px solid var(--line);
+  border-radius:3px;overflow:hidden;min-width:0}
+.wkc.today{border-color:var(--amber)}
+.wkc .wb{position:absolute;left:2px;right:2px;background:var(--blk-2);border-radius:1.5px;
+  border-left:2px solid var(--faint)}
+.wkc .wb.h{border-left-color:var(--amber)} .wkc .wb.t{border-left-color:#6fa8d0}
+.wkc .wb.a{border-left-color:#a98fd0}
+.wkc .wb.d{background:var(--green-d);border-left-color:var(--green)}
+.wkc .wb.m{background:var(--red-d);border-left-color:var(--red)}
+.wkc .wn{position:absolute;left:0;right:0;border-top:1px solid var(--amber);z-index:5}
+.wkh{display:flex;gap:5px;margin-bottom:6px}
+.wkh div{flex:1;text-align:center;font-size:9px;letter-spacing:.1em;color:var(--faint);min-width:0}
+.wkh div b{display:block;font-size:13px;color:var(--dim);font-weight:600;letter-spacing:0;margin-top:1px}
+.wkh div.today b{color:var(--amber)}
+
+.mo{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.mo .dow{text-align:center;font-size:8.5px;letter-spacing:.11em;color:var(--faint);padding-bottom:3px}
+.mc{aspect-ratio:1;background:var(--panel);border:1px solid var(--line);border-radius:3px;
+  padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.mc.out{opacity:.28} .mc.today{border-color:var(--amber)}
+.mc .dn{font-size:11px;color:var(--dim);letter-spacing:-.02em}
+.mc.today .dn{color:var(--amber);font-weight:700}
+.mc .pips{display:flex;flex-wrap:wrap;gap:1.5px;justify-content:center;align-content:flex-start;flex:1}
+.mc .pips i{width:4px;height:4px;border-radius:50%;background:var(--faint);display:block}
+.mc .pips i.d{background:var(--green)} .mc .pips i.m{background:var(--red)}
+.mc .bar{width:100%;height:2px;background:var(--line-soft);border-radius:2px;overflow:hidden;flex:0 0 auto}
+.mc .bar b{display:block;height:100%;background:var(--green)}
+
+/* ---------- pool / lists ---------- */
+.row{
+  display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);
+  border-radius:4px;padding:9px 11px;margin-bottom:6px;
+}
+.row.late{border-color:rgba(224,87,79,.5);background:linear-gradient(90deg,var(--red-d),var(--panel) 55%)}
+.row.off{opacity:.45}
+.row .m{flex:1;min-width:0}
+.row .m b{display:block;font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .m i{font-style:normal;display:block;font-size:9.5px;color:var(--faint);letter-spacing:.06em;margin-top:2px}
+.row .m i .r{color:var(--red)}
+
+/* ---------- sheet / modal ---------- */
+#veil{position:fixed;inset:0;background:rgba(4,6,8,.72);z-index:50;display:none;
+  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+#veil.on{display:block}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--panel);
+  border-top:1px solid var(--line-hard);border-radius:11px 11px 0 0;
+  padding:0 14px calc(16px + var(--sab));max-height:88vh;overflow-y:auto;
+  transform:translateY(102%);transition:transform .2s cubic-bezier(.32,.72,0,1);display:none;
+}
+.sheet.on{display:block;transform:translateY(0)}
+.grab{width:34px;height:3px;background:var(--line-hard);border-radius:3px;margin:9px auto 12px}
+.sh{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.sh b{flex:1;font-size:13px;letter-spacing:.09em;font-weight:600}
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:9px;letter-spacing:.16em;color:var(--faint);margin-bottom:4px}
+.fld input,.fld select,.fld textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:3px;
+  padding:9px 10px;font-size:13px;font-family:var(--mono);user-select:text;
+}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--line-hard)}
+.fld textarea{font-family:var(--sans);resize:vertical;min-height:58px}
+.fld select{-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.two{display:flex;gap:9px} .two>*{flex:1;min-width:0}
+.dows{display:flex;gap:4px}
+.dows button{flex:1;padding:8px 0;border:1px solid var(--line);border-radius:3px;
+  font-size:10px;color:var(--faint);background:var(--bg);letter-spacing:.04em}
+.dows button.on{border-color:var(--amber);color:var(--amber);background:var(--amber-d)}
+.btn{
+  width:100%;padding:12px;border:1px solid var(--line-hard);border-radius:4px;
+  font-size:12px;letter-spacing:.13em;color:var(--fg);background:var(--panel2);margin-top:5px;
+}
+.btn:active{background:var(--raise)}
+.btn.pri{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:700}
+.btn.go{border-color:var(--green);color:var(--green);background:var(--green-d)}
+.btn.no{border-color:var(--red);color:var(--red);background:var(--red-d)}
+.btn.gh{border-color:var(--line);color:var(--dim);background:none}
+.note{font-size:10.5px;color:var(--faint);line-height:1.65;margin:7px 0 0}
+.note.warn{color:var(--amber)}
+.warnbox{border:1px solid rgba(232,176,75,.35);background:var(--amber-d);border-radius:4px;
+  padding:10px 11px;font-size:11px;line-height:1.6;color:#f0dcb4;margin-bottom:12px}
+.warnbox b{color:var(--amber);letter-spacing:.06em}
+.diff{border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-bottom:12px}
+.diff div{display:flex;justify-content:space-between;padding:8px 11px;font-size:11px;
+  border-bottom:1px solid var(--line-soft)}
+.diff div:last-child{border-bottom:0}
+.diff div b{letter-spacing:.05em}
+.diff .ok b{color:var(--green)} .diff .up b{color:var(--amber)} .diff .er b{color:var(--red)}
+.errl{max-height:130px;overflow-y:auto;font-size:10px;color:var(--red);line-height:1.7;
+  border-left:2px solid var(--red);padding-left:9px;margin-bottom:12px}
+
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%) translateY(-14px);
+  bottom:calc(var(--bar) + var(--sab) + 12px);z-index:60;background:var(--raise);
+  border:1px solid var(--line-hard);border-radius:4px;padding:9px 15px;font-size:11.5px;
+  letter-spacing:.05em;opacity:0;pointer-events:none;transition:.18s;max-width:88vw;text-align:center;
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.go{border-color:var(--green);color:#c8ecd6}
+#toast.no{border-color:var(--red);color:#f4d8d4}
+
+#nag{background:var(--amber-d);border-bottom:1px solid rgba(232,176,75,.35);padding:8px 12px;
+  display:none;align-items:center;gap:9px;font-size:10.5px;color:#f0dcb4;flex:0 0 auto}
+#nag.on{display:flex}
+#nag span{flex:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div class="stamp">SCHED</div>
+  <div class="ctx" id="ctx"><b id="ctxA">—</b><i id="ctxB"></i></div>
+  <button class="ico" id="bUndo" title="Undo">&#8630;</button>
+  <button class="ico" id="bRedo" title="Redo">&#8631;</button>
+  <button class="ico" id="bMenu" title="Menu">&#9776;</button>
+</div>
+
+<div id="nag"><span id="nagT"></span><button class="mini am" id="nagGo">EXPORT</button><button class="mini" id="nagX">LATER</button></div>
+
+<main>
+  <!-- STREAKS -->
+  <section class="view on" id="vStreak"><div class="pad">
+    <div id="stkHero"></div>
+    <div class="eyebrow">HABITS</div>
+    <div id="stkList"></div>
+    <div class="eyebrow" style="margin-top:18px">TODAY REMAINING</div>
+    <div id="stkTodo"></div>
+  </div></section>
+
+  <!-- DAY -->
+  <section class="view" id="vDay">
+    <div id="dayWrap">
+      <div id="dayTools">
+        <span class="zl">SPAN</span>
+        <input type="range" id="zoom" min="1" max="24" step="1" value="8">
+        <span class="zl" id="zoomV" style="width:26px;text-align:right;color:var(--dim)">8H</span>
+        <button class="ico" id="bFmt" style="width:38px;font-size:9.5px;letter-spacing:.04em">24H</button>
+        <button class="ico" id="bNow" title="Jump to now">&#9673;</button>
+      </div>
+      <div id="scroller"><div id="canvas"></div></div>
+    </div>
+  </section>
+
+  <!-- WEEK -->
+  <section class="view" id="vWeek"><div class="pad">
+    <div class="wkh" id="wkHead"></div>
+    <div class="wk" id="wkBody"></div>
+    <div style="display:flex;gap:9px;margin:4px 0 16px">
+      <button class="mini" id="wkPrev" style="flex:1;padding:8px">&#8592; PREV</button>
+      <button class="mini" id="wkThis" style="flex:1;padding:8px">THIS WEEK</button>
+      <button class="mini" id="wkNext" style="flex:1;padding:8px">NEXT &#8594;</button>
+    </div>
+    <div class="eyebrow">WEEK SUMMARY</div>
+    <div id="wkStats"></div>
+  </div></section>
+
+  <!-- MONTH -->
+  <section class="view" id="vMonth"><div class="pad">
+    <div style="display:flex;gap:9px;margin-bottom:12px">
+      <button class="mini" id="moPrev" style="flex:1;padding:8px">&#8592;</button>
+      <button class="mini" id="moThis" style="flex:2;padding:8px">THIS MONTH</button>
+      <button class="mini" id="moNext" style="flex:1;padding:8px">&#8594;</button>
+    </div>
+    <div class="mo" id="moGrid"></div>
+    <div class="eyebrow" style="margin-top:18px">MONTH SUMMARY</div>
+    <div id="moStats"></div>
+  </div></section>
+
+  <!-- POOL -->
+  <section class="view" id="vPool"><div class="pad">
+    <div style="display:flex;gap:7px;margin-bottom:14px">
+      <button class="btn" id="pAdd" style="margin:0;flex:1">+ NEW ITEM</button>
+      <button class="btn gh" id="pCopy" style="margin:0;flex:0 0 auto;padding:12px 13px">COPY YDAY</button>
+    </div>
+    <div class="eyebrow">UNPLACED &#183; TASKS</div>
+    <div id="poolTask"></div>
+    <div class="eyebrow" style="margin-top:18px">IRREGULAR &#183; PLACE ON DEMAND</div>
+    <div id="poolIrr"></div>
+    <div class="eyebrow" style="margin-top:18px">RECURRING &#183; AUTO-PLACED</div>
+    <div id="poolRec"></div>
+    <div class="eyebrow" style="margin-top:18px">APPOINTMENTS</div>
+    <div id="poolApt"></div>
+  </div></section>
+</main>
+
+<div id="nav">
+  <button data-v="vStreak" class="on"><span class="g">&#9650;</span>STREAKS</button>
+  <button data-v="vDay"><span class="g">&#9707;</span>DAY</button>
+  <button data-v="vWeek"><span class="g">&#9636;</span>WEEK</button>
+  <button data-v="vMonth"><span class="g">&#9638;</span>MONTH</button>
+  <button data-v="vPool"><span class="g">&#9679;</span>POOL</button>
+</div>
+
+<div id="veil"></div>
+<div id="toast"></div>
+
+<!-- BLOCK DETAIL -->
+<div class="sheet" id="shBlock"><div class="grab"></div>
+  <div class="sh"><b id="blkNm">—</b><span class="tag" id="blkTag"></span></div>
+  <div id="blkMeta" class="note" style="margin-bottom:12px"></div>
+  <div id="blkDesc" style="font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--dim);
+    border-left:2px solid var(--line);padding-left:11px;margin-bottom:14px;user-select:text"></div>
+  <div id="blkActual" class="diff" style="display:none"></div>
+  <div class="two"><button class="btn go" id="blkDone">MARK DONE</button>
+    <button class="btn gh" id="blkSkip">SKIP TODAY</button></div>
+  <div class="two"><button class="btn gh" id="blkEdit">EDIT TIME</button>
+    <button class="btn no" id="blkDel">REMOVE</button></div>
+  <div id="blkUnplace"></div>
+  <p class="note" id="blkHint"></p>
+</div>
+
+<!-- CREATE / EDIT ITEM -->
+<div class="sheet" id="shNew"><div class="grab"></div>
+  <div class="sh"><b id="newTitle">NEW ITEM</b><button class="ico" id="newX">&#10005;</button></div>
+  <div class="fld"><label>KIND</label><select id="fKind">
+    <option value="habit">HABIT &#183; streak tracked</option>
+    <option value="fixture">FIXTURE &#183; recurring, no streak</option>
+    <option value="task">TASK &#183; has a deadline</option>
+    <option value="appt">APPOINTMENT &#183; fixed date</option>
+  </select></div>
+  <div class="fld"><label>NAME</label><input id="fName" placeholder="Morning lift" autocomplete="off"></div>
+  <div class="fld"><label>DESCRIPTION &#183; OPTIONAL</label><textarea id="fDesc" placeholder="Shown when you tap the block"></textarea></div>
+  <div class="fld" id="wrapDays"><label>DAYS</label><div class="dows" id="fDays"></div>
+    <p class="note">Leave all off to make it irregular — it waits in the pool until you place it.</p></div>
+  <div class="fld" id="wrapDate"><label>DATE</label><input type="date" id="fDate"></div>
+  <div class="fld" id="wrapDl"><label>DEADLINE</label><input type="date" id="fDl"></div>
+  <div class="two">
+    <div class="fld" id="wrapStart"><label>START</label><input type="time" id="fStart" value="07:00"></div>
+    <div class="fld"><label id="labDur">MINUTES</label><input type="number" id="fDur" value="30" min="5" step="5"></div>
+  </div>
+  <button class="btn pri" id="fSave">SAVE</button>
+  <button class="btn no" id="fDelete" style="display:none">DELETE ITEM</button>
+</div>
+
+<!-- OVERLAP -->
+<div class="sheet" id="shOver"><div class="grab"></div>
+  <div class="sh"><b>OVERLAP</b><span class="tag red">CONFLICT</span></div>
+  <div class="warnbox" id="ovTxt"></div>
+  <button class="btn" id="ovKeep">KEEP BOTH &#183; SIDE BY SIDE</button>
+  <button class="btn" id="ovSnap">SNAP TO NEXT FREE SLOT</button>
+  <button class="btn gh" id="ovCancel">CANCEL</button>
+</div>
+
+<!-- PLACEMENT / GAP FINDER -->
+<div class="sheet" id="shPlace"><div class="grab"></div>
+  <div class="sh"><b id="plNm">PLACE</b><button class="ico" id="plX">&#10005;</button></div>
+  <div class="fld"><label>DATE</label><input type="date" id="plDate"></div>
+  <p class="note" style="margin-bottom:9px">Open slots long enough to hold it:</p>
+  <div id="plGaps"></div>
+  <div class="two" style="margin-top:9px">
+    <div class="fld"><label>OR SET TIME</label><input type="time" id="plTime" value="09:00"></div>
+    <div class="fld"><label>MINUTES</label><input type="number" id="plDur" value="30" min="5" step="5"></div>
+  </div>
+  <button class="btn pri" id="plGo">PLACE HERE</button>
+</div>
+
+<!-- MENU -->
+<div class="sheet" id="shMenu"><div class="grab"></div>
+  <div class="sh"><b>SYSTEM</b><button class="ico" id="mX">&#10005;</button></div>
+  <div id="mStore" class="note" style="margin-bottom:13px"></div>
+  <div class="eyebrow">SPREADSHEET</div>
+  <button class="btn" id="mXlsxOut">EXPORT WORKBOOK &#183; .XLSX</button>
+  <button class="btn" id="mXlsxIn">IMPORT WORKBOOK</button>
+  <p class="note">The workbook is the round trip. Export, edit in Excel, import back — rows match on ID so nothing duplicates.</p>
+  <div class="eyebrow" style="margin-top:17px">BACKUP</div>
+  <button class="btn" id="mJsonOut">SAVE SNAPSHOT &#183; .JSON</button>
+  <button class="btn" id="mJsonIn">RESTORE SNAPSHOT</button>
+  <p class="note">The snapshot restores everything exactly, streak history included.</p>
+  <div class="eyebrow" style="margin-top:17px">SETTINGS</div>
+  <div class="fld"><label>DAY ROLLS OVER AT</label><input type="time" id="mRoll" value="04:00">
+    <p class="note">A block before this hour counts toward the previous day, so a late night doesn't read as a miss.</p></div>
+  <div class="fld"><label>NAG ME IF I HAVEN'T EXPORTED IN</label><input type="number" id="mNag" value="7" min="0" max="90">
+    <p class="note">Days. Set 0 to switch it off.</p></div>
+  <button class="btn no" id="mWipe" style="margin-top:15px">ERASE ALL DATA</button>
+  <input type="file" id="fileIn" accept=".xlsx,.json" style="display:none">
+</div>
+
+<!-- IMPORT PREVIEW -->
+<div class="sheet" id="shImp"><div class="grab"></div>
+  <div class="sh"><b>IMPORT PREVIEW</b><button class="ico" id="iX">&#10005;</button></div>
+  <div class="diff" id="impDiff"></div>
+  <div class="errl" id="impErr" style="display:none"></div>
+  <button class="btn pri" id="impGo">APPLY IMPORT</button>
+  <button class="btn gh" id="impNo">CANCEL</button>
+  <p class="note">Nothing is written until you apply. Undo still works afterwards.</p>
+</div>
+
+<!-- CONFIRM -->
+<div class="sheet" id="shAsk"><div class="grab"></div>
+  <div class="sh"><b id="askT">CONFIRM</b></div>
+  <p class="note" id="askB" style="margin-bottom:14px;font-size:12px"></p>
+  <button class="btn no" id="askY">CONFIRM</button>
+  <button class="btn gh" id="askN">CANCEL</button>
+</div>
+<script>
+"use strict";
+/* ============================ STORAGE ============================
+   localStorage where available; silent in-memory fallback so the app
+   still runs from a sandboxed preview. Hosted over https it also asks
+   Android to mark the origin as persistent. */
+const KEY="sched.v1";
+let memStore=null, storeMode="memory";
+const Store={
+  read(){
+    if(memStore!==null) return memStore;
+    try{ const r=localStorage.getItem(KEY); storeMode="local"; return r?JSON.parse(r):null; }
+    catch(e){ memStore=memStore||null; return memStore; }
+  },
+  write(o){
+    memStore=o;
+    try{ localStorage.setItem(KEY,JSON.stringify(o)); storeMode="local"; return true; }
+    catch(e){ storeMode="memory"; return false; }
+  }
+};
+(async()=>{ try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist(); }catch(e){} })();
+
+/* ============================ TIME ============================ */
+const DOW=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const MON=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+function parseYmd(s){ const p=String(s).split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+function addDays(s,n){ const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); }
+function dowOf(s){ return parseYmd(s).getDay(); }
+function hm2min(s){ if(!s) return 0; const p=String(s).split(":"); return (+p[0])*60+(+p[1]||0); }
+function min2hm(m){ m=((Math.round(m)%1440)+1440)%1440; return pad(Math.floor(m/60))+":"+pad(m%60); }
+function fmtT(m,force){
+  m=((Math.round(m)%1440)+1440)%1440;
+  const h=Math.floor(m/60), mi=m%60;
+  if(force===undefined?S.cfg.fmt24:force) return pad(h)+":"+pad(mi);
+  const ap=h<12?"am":"pm"; let hh=h%12; if(hh===0) hh=12;
+  return hh+":"+pad(mi)+ap;
+}
+function fmtDur(m){
+  if(m<60) return m+"m";
+  const h=Math.floor(m/60), r=m%60;
+  return r? h+"h"+pad(r) : h+"h";
+}
+/* "logical today" — before the rollover hour you are still on yesterday */
+function todayStr(){
+  const n=new Date(), m=n.getHours()*60+n.getMinutes();
+  const d=new Date(n); if(m < (S?S.cfg.roll:240)) d.setDate(d.getDate()-1);
+  return ymd(d);
+}
+function nowMin(){ const n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
+function prettyDate(s){
+  const d=parseYmd(s);
+  return DOW[d.getDay()]+" "+pad(d.getDate())+" "+MON[d.getMonth()];
+}
+function relDate(s){
+  const t=todayStr();
+  if(s===t) return "TODAY";
+  if(s===addDays(t,1)) return "TOMORROW";
+  if(s===addDays(t,-1)) return "YESTERDAY";
+  const diff=Math.round((parseYmd(s)-parseYmd(t))/864e5);
+  return (diff>0?"IN "+diff+"D":Math.abs(diff)+"D AGO");
+}
+const uid=()=>Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-4);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ============================ STATE ============================ */
+const FRESH={ v:1, items:[], inst:{}, gen:{}, cfg:{fmt24:true,roll:240,zoom:8,nagDays:7,lastExp:null} };
+let S=Store.read()||JSON.parse(JSON.stringify(FRESH));
+if(!S.cfg) S.cfg=JSON.parse(JSON.stringify(FRESH.cfg));
+for(const k in FRESH.cfg) if(S.cfg[k]===undefined) S.cfg[k]=FRESH.cfg[k];
+
+let UNDO=[],REDO=[];
+const snap=()=>JSON.parse(JSON.stringify(S));
+/* call before any mutation */
+function mark(){ UNDO.push(snap()); if(UNDO.length>60) UNDO.shift(); REDO.length=0; }
+function commit(rerender){ Store.write(S); if(rerender!==false) draw(); syncUndo(); }
+function undo(){
+  if(!UNDO.length) return toast("Nothing to undo");
+  REDO.push(snap()); S=UNDO.pop(); Store.write(S); draw(); syncUndo(); toast("Undone");
+}
+function redo(){
+  if(!REDO.length) return toast("Nothing to redo");
+  UNDO.push(snap()); S=REDO.pop(); Store.write(S); draw(); syncUndo(); toast("Redone");
+}
+function syncUndo(){ $("#bUndo").disabled=!UNDO.length; $("#bRedo").disabled=!REDO.length; }
+
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+
+/* ============================ DAY GENERATION ============================
+   Recurring items materialise into a day the first time that day is
+   touched. Nothing is written months ahead, so editing a habit does not
+   leave orphans scattered through the future. */
+function ensureDay(date){
+  if(S.gen[date]) return S.inst[date]||(S.inst[date]=[]);
+  const list=S.inst[date]||(S.inst[date]=[]);
+  const dw=dowOf(date);
+  for(const it of S.items){
+    if(it.archived) continue;
+    if(it.kind==="habit"||it.kind==="fixture"){
+      if(!it.days||!it.days.includes(dw)) continue;
+      if(it.from && date<it.from) continue;
+      if(list.some(b=>b.src===it.id)) continue;
+      list.push({id:uid(),src:it.id,kind:it.kind,name:it.name,desc:it.desc||"",
+                 start:it.start,dur:it.dur,done:false,skip:false,aStart:null,aDur:null});
+    } else if(it.kind==="appt" && it.date===date){
+      if(list.some(b=>b.src===it.id)) continue;
+      list.push({id:uid(),src:it.id,kind:"appt",name:it.name,desc:it.desc||"",
+                 start:it.start,dur:it.dur,done:false,skip:false,aStart:null,aDur:null});
+    }
+  }
+  S.gen[date]=1;
+  return list;
+}
+function dayBlocks(date){ return ensureDay(date); }
+/* pre-build the visible week so week/month views are not blank */
+function primeWeek(base){
+  const st=weekStart(base||todayStr());
+  for(let i=0;i<7;i++) ensureDay(addDays(st,i));
+}
+function weekStart(date){ const d=parseYmd(date); d.setDate(d.getDate()-d.getDay()); return ymd(d); }
+
+/* a recurring item changed — rebuild it on today and any future day already built */
+function regenFuture(itemId){
+  const t=todayStr();
+  const it=S.items.find(x=>x.id===itemId);
+  for(const date in S.inst){
+    if(date<t) continue;                     // history is history
+    const list=S.inst[date];
+    for(let i=list.length-1;i>=0;i--){
+      const b=list[i];
+      if(b.src===itemId && !b.done && !b.skip && !b.moved) list.splice(i,1);
+    }
+    if(it && !it.archived && S.gen[date]){
+      const dw=dowOf(date);
+      const due = (it.kind==="appt") ? it.date===date : (it.days&&it.days.includes(dw));
+      if(due && !list.some(b=>b.src===itemId)){
+        list.push({id:uid(),src:it.id,kind:it.kind,name:it.name,desc:it.desc||"",
+                   start:it.start,dur:it.dur,done:false,skip:false,aStart:null,aDur:null});
+      }
+    }
+  }
+}
+
+/* ============================ STREAKS ============================ */
+function streakOf(itemId){
+  const t=todayStr();
+  let cur=0,day=t,guard=0;
+  while(guard++<500){
+    const list=S.inst[day];
+    if(!list){ if(day<earliest()) break; day=addDays(day,-1); continue; }
+    const b=list.find(x=>x.src===itemId);
+    if(!b){ day=addDays(day,-1); continue; }        // not scheduled — neutral
+    if(b.done){ cur++; }
+    else if(b.skip){ /* deliberate skip preserves */ }
+    else if(day===t){ /* today still open */ }
+    else break;
+    day=addDays(day,-1);
+  }
+  // best streak across everything on record
+  const days=Object.keys(S.inst).sort();
+  let best=0,run=0;
+  for(const d of days){
+    const b=(S.inst[d]||[]).find(x=>x.src===itemId);
+    if(!b) continue;
+    if(b.done){ run++; if(run>best) best=run; }
+    else if(b.skip){ /* hold */ }
+    else if(d===t){ /* open */ }
+    else run=0;
+  }
+  if(cur>best) best=cur;
+  return {cur,best};
+}
+let _earliest=null;
+function earliest(){
+  if(_earliest) return _earliest;
+  const k=Object.keys(S.inst).sort();
+  _earliest=k.length?k[0]:todayStr();
+  return _earliest;
+}
+function last30(itemId){
+  const out=[],t=todayStr();
+  for(let i=29;i>=0;i--){
+    const d=addDays(t,-i), list=S.inst[d];
+    const b=list?list.find(x=>x.src===itemId):null;
+    if(!b) out.push({c:"n",d});
+    else if(b.done) out.push({c:"d",d});
+    else if(b.skip) out.push({c:"s",d});
+    else if(d===t) out.push({c:"t",d});
+    else out.push({c:"m",d});
+  }
+  return out;
+}
+
+/* ============================ LAYOUT PACKING ============================
+   Overlapping blocks share the width instead of hiding each other. */
+function packDay(blocks){
+  const bs=blocks.slice().sort((a,b)=>a.start-b.start||a.dur-b.dur);
+  const out=new Map(); let cluster=[],clusterEnd=-1;
+  const flush=()=>{
+    if(!cluster.length) return;
+    const cols=[];
+    for(const b of cluster){
+      let ci=cols.findIndex(c=>c[c.length-1].start+c[c.length-1].dur<=b.start);
+      if(ci<0){ cols.push([b]); ci=cols.length-1; } else cols[ci].push(b);
+      out.set(b.id,{col:ci});
+    }
+    for(const b of cluster) out.get(b.id).of=cols.length;
+    cluster=[]; clusterEnd=-1;
+  };
+  for(const b of bs){
+    if(cluster.length && b.start>=clusterEnd) flush();
+    cluster.push(b); clusterEnd=Math.max(clusterEnd,b.start+b.dur);
+  }
+  flush();
+  return out;
+}
+function overlapsIn(date,start,dur,ignoreId){
+  return dayBlocks(date).filter(b=>b.id!==ignoreId && b.start<start+dur && start<b.start+b.dur);
+}
+/* free windows of at least `need` minutes, inside waking bounds */
+function findGaps(date,need){
+  const bs=dayBlocks(date).slice().sort((a,b)=>a.start-b.start);
+  const lo=S.cfg.roll+120, hi=1440;                 // start a couple hours past rollover
+  const gaps=[]; let cur=lo;
+  for(const b of bs){
+    if(b.start>cur && b.start-cur>=need) gaps.push({start:cur,dur:b.start-cur});
+    cur=Math.max(cur,b.start+b.dur);
+  }
+  if(hi-cur>=need) gaps.push({start:cur,dur:hi-cur});
+  return gaps.slice(0,6);
+}
+/* ============================ VIEW STATE ============================ */
+let VIEW="vStreak", CUR=todayStr(), WKB=todayStr(), MOB=todayStr();
+let SEL=null;
+
+function toast(msg,cls){
+  const t=$("#toast"); t.textContent=msg; t.className="on "+(cls||"");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.className="",1900);
+}
+function go(v){
+  VIEW=v;
+  $$(".view").forEach(x=>x.classList.toggle("on",x.id===v));
+  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  draw();
+  if(v==="vDay") requestAnimationFrame(()=>scrollToNow(false));
+}
+function draw(){
+  primeWeek(VIEW==="vWeek"?WKB:CUR);
+  const t=todayStr();
+  if(VIEW==="vStreak"){ $("#ctxA").textContent="STREAKS"; $("#ctxB").textContent=prettyDate(t); drawStreak(); }
+  if(VIEW==="vDay"){ $("#ctxA").textContent=prettyDate(CUR); $("#ctxB").textContent=relDate(CUR); drawDay(); }
+  if(VIEW==="vWeek"){ const s=weekStart(WKB);
+    $("#ctxA").textContent="WEEK OF "+prettyDate(s); $("#ctxB").textContent=relDate(s); drawWeek(); }
+  if(VIEW==="vMonth"){ const d=parseYmd(MOB);
+    $("#ctxA").textContent=MON[d.getMonth()]+" "+d.getFullYear(); $("#ctxB").textContent="MONTH"; drawMonth(); }
+  if(VIEW==="vPool"){ $("#ctxA").textContent="POOL"; $("#ctxB").textContent="UNPLACED & RECURRING"; drawPool(); }
+  checkNag();
+}
+
+/* ============================ STREAKS ============================ */
+function drawStreak(){
+  const t=todayStr(), habits=S.items.filter(i=>i.kind==="habit"&&!i.archived);
+  const today=dayBlocks(t);
+  const hb=today.filter(b=>b.kind==="habit");
+  const done=hb.filter(b=>b.done||b.skip).length;
+  const pct=hb.length?Math.round(done/hb.length*100):0;
+  const cls=pct>=100?"ok":pct>=50?"mid":"lo";
+  $("#stkHero").innerHTML= hb.length
+    ? `<div class="hero"><div class="num ${cls}">${pct}<span style="font-size:14px">%</span></div>
+       <div class="txt"><b>${done} of ${hb.length} habits closed out</b>
+       <i>${prettyDate(t)} &#183; day rolls at ${fmtT(S.cfg.roll)}</i></div></div>`
+    : `<div class="empty"><b>NO HABITS YET</b>Add one from the Pool tab and it will start
+       placing itself on the days you pick.</div>`;
+
+  $("#stkList").innerHTML = habits.length ? habits.map(h=>{
+    const {cur,best}=streakOf(h.id);
+    const cells=last30(h.id).map(c=>`<span class="${c.c}"></span>`).join("");
+    const tb=today.find(b=>b.src===h.id);
+    const state=!tb?"not scheduled today":tb.done?"done":tb.skip?"skipped":"open &#183; "+fmtT(tb.start);
+    const k=tb? (tb.done||tb.skip?"allq":"due") : "";
+    return `<div class="card ${k}">
+      <div class="crow"><span class="nm">${esc(h.name)}</span>
+        <span class="big ${cur?"":"zero"}">${cur}</span><span class="sub">DAY</span></div>
+      <div class="grid30">${cells}</div>
+      <div class="cfoot"><span>BEST ${best}</span><span class="push"></span><span>${state}</span>
+        ${tb&&!tb.done&&!tb.skip?`<button class="mini go" data-tick="${tb.id}">DONE</button>`:""}</div>
+    </div>`;
+  }).join("") : "";
+
+  const open=today.filter(b=>!b.done&&!b.skip).sort((a,b)=>a.start-b.start);
+  $("#stkTodo").innerHTML = open.length ? open.map(b=>`
+    <div class="row"><span class="tag ${tagCls(b.kind)}">${b.kind.slice(0,3).toUpperCase()}</span>
+      <div class="m"><b>${esc(b.name)}</b><i>${fmtT(b.start)} &#183; ${fmtDur(b.dur)}</i></div>
+      <button class="mini go" data-tick="${b.id}">DONE</button></div>`).join("")
+    : `<div class="empty"><b>DAY IS CLEAR</b>Everything scheduled has been closed out.</div>`;
+}
+const tagCls=k=>({habit:"hab",fixture:"fix",task:"tsk",appt:"apt"}[k]||"fix");
+
+/* ============================ DAY ============================ */
+function ppm(){ const h=$("#scroller").clientHeight||520; return h/(S.cfg.zoom*60); }
+function drawDay(){
+  const c=$("#canvas"), p=ppm(), t=todayStr();
+  c.style.height=(1440*p)+"px";
+  const past=CUR<t, future=CUR>t, isToday=CUR===t;
+  let h="";
+  const step = S.cfg.zoom<=3?15 : S.cfg.zoom<=8?30 : 60;
+  for(let m=0;m<=1440;m+=step){
+    const on=m%60===0;
+    h+=`<div class="hr ${on?"":"q"}" style="top:${m*p}px"></div>`;
+    if(on && (S.cfg.zoom<=12 || m%120===0)) h+=`<div class="hlab" style="top:${m*p}px">${m===1440?"":fmtT(m)}</div>`;
+  }
+  // deadline markers for tasks due today
+  for(const it of S.items){
+    if(it.kind==="task"&&!it.done&&it.deadline===CUR)
+      h+=`<div class="dlmk" style="top:${1439*p}px"><span>DUE &#183; ${esc(it.name.toUpperCase())}</span></div>`;
+  }
+  const blocks=dayBlocks(CUR), pack=packDay(blocks), n=nowMin();
+  for(const b of blocks){
+    const g=pack.get(b.id)||{col:0,of:1};
+    const w=100/g.of, left=g.col*w;
+    const top=b.start*p, hh=Math.max(b.dur*p,15);
+    let prog = past?1 : future?0 : clamp((n-b.start)/b.dur,0,1);
+    const miss = !b.done && !b.skip && (past || (isToday && b.start+b.dur < n));
+    const cls=["blk"];
+    if(hh<27) cls.push("tiny");
+    if(b.done) cls.push("done"); else if(miss) cls.push("miss");
+    if(b.skip) cls.push("skip");
+    if(prog>=1&&!b.done&&!miss) cls.push("past");
+    if(SEL===b.id) cls.push("sel");
+    const dl=S.items.find(i=>i.id===b.src&&i.kind==="task"&&i.deadline===CUR);
+    if(dl) cls.push("dl");
+    h+=`<div class="${cls.join(" ")}" data-b="${b.id}" data-t="${b.kind}"
+      style="top:${top}px;height:${hh}px;left:calc(${left}% + 3px);width:calc(${w}% - 6px)">
+      <div class="fill" style="clip-path:inset(0 0 ${(1-prog)*100}% 0)"></div>
+      <div class="bh"><span class="dot"></span>${esc(b.name)}</div>
+      ${hh>=27?`<div class="bt">${fmtT(b.start)}&#8202;&#8211;&#8202;${fmtT(b.start+b.dur)} &#183; ${fmtDur(b.dur)}</div>`:""}
+      ${SEL===b.id?'<div class="hnd t"></div><div class="hnd b"></div>':""}
+    </div>`;
+  }
+  if(isToday) h+=`<div id="nowline" style="top:${n*p}px"><div class="np">${fmtT(n)}</div></div>`;
+  c.innerHTML=h;
+  $("#zoomV").textContent=S.cfg.zoom+"H";
+  $("#zoom").value=S.cfg.zoom;
+  $("#bFmt").textContent=S.cfg.fmt24?"24H":"12H";
+}
+function scrollToNow(smooth){
+  const s=$("#scroller"), p=ppm();
+  const target=Math.max(0,(CUR===todayStr()?nowMin():540)*p - s.clientHeight*0.35);
+  if(s.scrollTo) s.scrollTo({top:target,behavior:smooth?"smooth":"auto"});
+  else s.scrollTop=target;
+}
+
+/* ============================ WEEK ============================ */
+function drawWeek(){
+  const st=weekStart(WKB), t=todayStr(), H=230;
+  let head="",body="";
+  for(let i=0;i<7;i++){
+    const d=addDays(st,i), dd=parseYmd(d), is=d===t;
+    head+=`<div class="${is?"today":""}">${DOW[i]}<b>${dd.getDate()}</b></div>`;
+    const bs=dayBlocks(d), pack=packDay(bs);
+    let inner="";
+    for(const b of bs){
+      const g=pack.get(b.id)||{col:0,of:1};
+      const w=100/g.of, left=g.col*w;
+      const miss=!b.done&&!b.skip&&(d<t||(d===t&&b.start+b.dur<nowMin()));
+      const k=b.done?"d":miss?"m":({habit:"h",task:"t",appt:"a"}[b.kind]||"");
+      inner+=`<div class="wb ${k}" style="top:${b.start/1440*H}px;height:${Math.max(b.dur/1440*H,3)}px;
+        left:calc(${left}% + 2px);width:calc(${w}% - 4px)"></div>`;
+    }
+    if(is) inner+=`<div class="wn" style="top:${nowMin()/1440*H}px"></div>`;
+    body+=`<div class="wkc ${is?"today":""}" data-d="${d}">${inner}</div>`;
+  }
+  $("#wkHead").innerHTML=head; $("#wkBody").innerHTML=body;
+  let tot=0,dn=0,ms=0;
+  for(let i=0;i<7;i++){ const d=addDays(st,i);
+    for(const b of dayBlocks(d)){
+      tot++; if(b.done) dn++;
+      else if(!b.skip && (d<t || (d===t && b.start+b.dur<nowMin()))) ms++;
+    } }
+  $("#wkStats").innerHTML=`<div class="diff">
+    <div class="ok"><span>COMPLETED</span><b>${dn}</b></div>
+    <div class="er"><span>MISSED</span><b>${ms}</b></div>
+    <div><span>SCHEDULED</span><b>${tot}</b></div>
+    <div><span>COMPLETION</span><b>${tot?Math.round(dn/tot*100):0}%</b></div></div>
+    <p class="note">Tap any column to open that day.</p>`;
+}
+
+/* ============================ MONTH ============================ */
+function drawMonth(){
+  const b=parseYmd(MOB), y=b.getFullYear(), m=b.getMonth(), t=todayStr();
+  const first=new Date(y,m,1), start=new Date(first); start.setDate(1-first.getDay());
+  let h=DOW.map(d=>`<div class="dow">${d[0]}</div>`).join("");
+  let tot=0,dn=0;
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const ds=ymd(d), out=d.getMonth()!==m, is=ds===t;
+    const bs=(S.gen[ds]?S.inst[ds]:null)||[];
+    const hb=bs.filter(x=>x.kind==="habit");
+    const cd=bs.filter(x=>x.done).length;
+    if(!out){ tot+=bs.length; dn+=cd; }
+    const pips=hb.slice(0,9).map(x=>{
+      const miss=!x.done&&!x.skip&&(ds<t);
+      return `<i class="${x.done?"d":miss?"m":""}"></i>`;
+    }).join("");
+    const pc=bs.length?Math.round(cd/bs.length*100):0;
+    h+=`<div class="mc ${out?"out":""} ${is?"today":""}" data-d="${ds}">
+      <span class="dn">${d.getDate()}</span><div class="pips">${pips}</div>
+      <div class="bar"><b style="width:${pc}%"></b></div></div>`;
+  }
+  $("#moGrid").innerHTML=h;
+  $("#moStats").innerHTML=`<div class="diff">
+    <div class="ok"><span>COMPLETED</span><b>${dn}</b></div>
+    <div><span>SCHEDULED</span><b>${tot}</b></div>
+    <div><span>COMPLETION</span><b>${tot?Math.round(dn/tot*100):0}%</b></div></div>
+    <p class="note">Only days already opened are filled in — recurring items build as each day arrives.</p>`;
+}
+
+/* ============================ POOL ============================ */
+function drawPool(){
+  const t=todayStr();
+  const tasks=S.items.filter(i=>i.kind==="task"&&!i.done&&!i.archived);
+  $("#poolTask").innerHTML = tasks.length? tasks.sort((a,b)=>(a.deadline||"9").localeCompare(b.deadline||"9")).map(i=>{
+    const late=i.deadline&&i.deadline<t;
+    const soon=i.deadline?relDate(i.deadline):"no deadline";
+    return `<div class="row ${late?"late":""}"><span class="tag tsk">TSK</span>
+      <div class="m"><b>${esc(i.name)}</b><i>${fmtDur(i.dur)} &#183;
+        <span class="${late?"r":""}">${late?"OVERDUE "+soon:"DUE "+soon}</span></i></div>
+      <button class="mini am" data-place="${i.id}">PLACE</button>
+      <button class="mini" data-edit="${i.id}">&#8942;</button></div>`;
+  }).join("") : `<div class="empty"><b>NOTHING WAITING</b>Tasks with a deadline live here until you drop them on a day.</div>`;
+
+  const irr=S.items.filter(i=>(i.kind==="habit"||i.kind==="fixture")&&(!i.days||!i.days.length)&&!i.archived);
+  $("#poolIrr").innerHTML = irr.length? irr.map(i=>`
+    <div class="row"><span class="tag ${tagCls(i.kind)}">${i.kind.slice(0,3).toUpperCase()}</span>
+      <div class="m"><b>${esc(i.name)}</b><i>${fmtDur(i.dur)} &#183; IRREGULAR</i></div>
+      <button class="mini am" data-place="${i.id}">PLACE</button>
+      <button class="mini" data-edit="${i.id}">&#8942;</button></div>`).join("")
+    : `<div class="empty"><b>NONE</b>An item with no days selected waits here instead of placing itself.</div>`;
+
+  const rec=S.items.filter(i=>(i.kind==="habit"||i.kind==="fixture")&&i.days&&i.days.length&&!i.archived);
+  $("#poolRec").innerHTML = rec.length? rec.map(i=>{
+    const dl=i.days.length===7?"EVERY DAY":i.days.map(d=>DOW[d][0]).join("");
+    return `<div class="row"><span class="tag ${tagCls(i.kind)}">${i.kind.slice(0,3).toUpperCase()}</span>
+      <div class="m"><b>${esc(i.name)}</b><i>${fmtT(i.start)} &#183; ${fmtDur(i.dur)} &#183; ${dl}</i></div>
+      <button class="mini" data-edit="${i.id}">&#8942;</button></div>`;
+  }).join("") : `<div class="empty"><b>NONE</b>Habits build streaks. Fixtures fill the day without being scored.</div>`;
+
+  const ap=S.items.filter(i=>i.kind==="appt"&&!i.archived&&i.date>=addDays(t,-3))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  $("#poolApt").innerHTML = ap.length? ap.map(i=>`
+    <div class="row ${i.date<t?"off":""}"><span class="tag apt">APT</span>
+      <div class="m"><b>${esc(i.name)}</b><i>${prettyDate(i.date)} &#183; ${fmtT(i.start)} &#183; ${relDate(i.date)}</i></div>
+      <button class="mini" data-edit="${i.id}">&#8942;</button></div>`).join("")
+    : `<div class="empty"><b>NONE UPCOMING</b></div>`;
+}
+
+/* ============================ TIMELINE INTERACTION ============================ */
+(function(){
+  const sc=$("#scroller"), cv=$("#canvas");
+  let mode=null,tid=null,startY=0,startX=0,orig=null,bid=null,moved=false,ghost=null;
+  const SNAP=5;
+  const yToMin=y=>{
+    const r=cv.getBoundingClientRect();
+    return clamp(Math.round((y-r.top)/ppm()/SNAP)*SNAP,0,1440);
+  };
+  function down(e){
+    if(e.touches&&e.touches.length>1) return;
+    const pt=e.touches?e.touches[0]:e;
+    startY=pt.clientY; startX=pt.clientX; moved=false; bid=null; orig=null;
+    const hnd=e.target.closest(".hnd");
+    const el=e.target.closest(".blk");
+    if(hnd&&el){
+      bid=el.dataset.b; orig=findBlk(bid); mode=hnd.classList.contains("t")?"top":"bot";
+      ghost=el; el.classList.add("drag"); e.preventDefault(); return;
+    }
+    if(el){
+      bid=el.dataset.b; orig=findBlk(bid); ghost=el;
+      tid=setTimeout(()=>{ if(!moved){ mode="move"; el.classList.add("drag");
+        if(navigator.vibrate) navigator.vibrate(12); } },330);
+      return;
+    }
+    // empty canvas long-press → create
+    const m=yToMin(pt.clientY);
+    tid=setTimeout(()=>{ if(!moved){ if(navigator.vibrate) navigator.vibrate(12); quickCreate(m); } },420);
+  }
+  function move(e){
+    const pt=e.touches?e.touches[0]:e;
+    const dy=pt.clientY-startY, dx=pt.clientX-startX;
+    if(!mode){ if(Math.abs(dy)>8||Math.abs(dx)>8){ moved=true; clearTimeout(tid); } return; }
+    e.preventDefault();
+    const dm=Math.round(dy/ppm()/SNAP)*SNAP;
+    const b=findBlk(bid); if(!b) return;
+    if(mode==="move") b.start=clamp(orig.start+dm,0,1440-b.dur);
+    if(mode==="top"){ const ns=clamp(orig.start+dm,0,orig.start+orig.dur-SNAP);
+      b.dur=orig.start+orig.dur-ns; b.start=ns; }
+    if(mode==="bot") b.dur=clamp(orig.dur+dm,SNAP,1440-b.start);
+    paintLive(b);
+  }
+  function up(){
+    clearTimeout(tid);
+    if(ghost) ghost.classList.remove("drag");
+    if(mode){
+      const b=findBlk(bid);
+      const o=overlapsIn(CUR,b.start,b.dur,b.id);
+      const changed=b.start!==orig.start||b.dur!==orig.dur;
+      if(changed){
+        // rewind, then re-apply through the marked path so undo captures it
+        const ns=b.start,nd=b.dur; b.start=orig.start; b.dur=orig.dur;
+        if(o.length){ pendingMove={bid,ns,nd}; showOverlap(o,ns,nd); }
+        else { mark(); b.start=ns; b.dur=nd; b.moved=1; commit(); }
+      }
+    } else if(bid&&!moved){
+      SEL=(SEL===bid)?null:bid;
+      openBlock(bid);
+      drawDay();
+    }
+    mode=null;bid=null;orig=null;ghost=null;
+  }
+  function paintLive(b){
+    const el=cv.querySelector(`[data-b="${b.id}"]`); if(!el) return;
+    const p=ppm();
+    el.style.top=(b.start*p)+"px"; el.style.height=Math.max(b.dur*p,15)+"px";
+    const t=el.querySelector(".bt");
+    if(t) t.textContent=fmtT(b.start)+"\u2013"+fmtT(b.start+b.dur)+" \u00b7 "+fmtDur(b.dur);
+  }
+  sc.addEventListener("touchstart",down,{passive:false});
+  sc.addEventListener("touchmove",move,{passive:false});
+  sc.addEventListener("touchend",up);
+  sc.addEventListener("mousedown",down);
+  window.addEventListener("mousemove",e=>{ if(mode||tid) move(e); });
+  window.addEventListener("mouseup",()=>{ if(mode||bid!=null) up(); });
+
+  // pinch to zoom the vertical axis
+  let pd=0,pz=0;
+  sc.addEventListener("touchstart",e=>{
+    if(e.touches.length===2){ clearTimeout(tid); mode=null;
+      pd=Math.abs(e.touches[0].clientY-e.touches[1].clientY); pz=S.cfg.zoom; }
+  },{passive:true});
+  sc.addEventListener("touchmove",e=>{
+    if(e.touches.length===2&&pd){
+      const d=Math.abs(e.touches[0].clientY-e.touches[1].clientY);
+      S.cfg.zoom=clamp(Math.round(pz*pd/Math.max(d,1)),1,24); drawDay();
+    }
+  },{passive:true});
+  sc.addEventListener("touchend",e=>{ if(e.touches.length<2&&pd){ pd=0; Store.write(S); } });
+})();
+function findBlk(id){ return dayBlocks(CUR).find(b=>b.id===id); }
+let pendingMove=null,pendingNew=null;
+/* ============================ SHEETS ============================ */
+let openSheet=null;
+function sheet(id){
+  if(openSheet) $(openSheet).classList.remove("on");
+  openSheet=id; $("#veil").classList.add("on");
+  const el=$(id); el.style.display="block";
+  requestAnimationFrame(()=>el.classList.add("on"));
+}
+function closeSheet(){
+  if(pendingMove||pendingNew){ pendingMove=null; pendingNew=null; setTimeout(draw,0); }
+  if(openSheet){ const el=$(openSheet); el.classList.remove("on");
+    setTimeout(()=>{ if(!el.classList.contains("on")) el.style.display="none"; },210); }
+  openSheet=null; $("#veil").classList.remove("on");
+}
+$("#veil").addEventListener("click",closeSheet);
+$$(".grab").forEach(g=>g.addEventListener("click",closeSheet));
+
+let askYes=null;
+function ask(title,body,fn){ $("#askT").textContent=title; $("#askB").textContent=body; askYes=fn; sheet("#shAsk"); }
+$("#askY").addEventListener("click",()=>{ const f=askYes; closeSheet(); if(f) f(); });
+$("#askN").addEventListener("click",closeSheet);
+
+/* ---------- block detail ---------- */
+let curBlk=null;
+function openBlock(id){
+  const b=findBlk(id); if(!b) return;
+  curBlk=id;
+  const t=todayStr();
+  const miss=!b.done&&!b.skip&&(CUR<t||(CUR===t&&b.start+b.dur<nowMin()));
+  $("#blkNm").textContent=b.name;
+  const tg=$("#blkTag"); tg.textContent=b.kind.toUpperCase(); tg.className="tag "+tagCls(b.kind);
+  $("#blkMeta").innerHTML=`${prettyDate(CUR)} &#183; ${fmtT(b.start)}&#8202;&#8211;&#8202;${fmtT(b.start+b.dur)}
+    &#183; ${fmtDur(b.dur)}${miss?' &#183; <span style="color:var(--red)">MISSED</span>':""}
+    ${b.done?' &#183; <span style="color:var(--green)">DONE</span>':""}${b.skip?" &#183; SKIPPED":""}`;
+  const d=$("#blkDesc");
+  if(b.desc){ d.style.display="block"; d.textContent=b.desc; } else d.style.display="none";
+  const act=$("#blkActual");
+  if(b.done&&b.aStart!=null){
+    const drift=b.aStart-b.start, dd=b.aDur-b.dur;
+    act.style.display="block";
+    act.innerHTML=`<div><span>PLANNED</span><b>${fmtT(b.start)} &#183; ${fmtDur(b.dur)}</b></div>
+      <div><span>ACTUAL</span><b>${fmtT(b.aStart)} &#183; ${fmtDur(b.aDur)}</b></div>
+      <div class="${Math.abs(drift)<=10?"ok":"up"}"><span>DRIFT</span>
+        <b>${drift>0?"+":""}${Math.round(drift)}m start / ${dd>0?"+":""}${Math.round(dd)}m length</b></div>`;
+  } else act.style.display="none";
+  $("#blkDone").textContent=b.done?"UNDO COMPLETE":"MARK DONE";
+  $("#blkDone").className="btn "+(b.done?"gh":"go");
+  $("#blkSkip").textContent=b.skip?"UNSKIP":"SKIP TODAY";
+  const src=S.items.find(i=>i.id===b.src);
+  $("#blkUnplace").innerHTML = (src&&src.kind==="task")
+    ? `<button class="btn gh" id="blkPool">SEND BACK TO POOL</button>` : "";
+  if($("#blkPool")) $("#blkPool").addEventListener("click",()=>{
+    mark(); const l=dayBlocks(CUR); l.splice(l.findIndex(x=>x.id===b.id),1);
+    closeSheet(); commit(); toast("Back in the pool");
+  });
+  $("#blkHint").innerHTML = b.kind==="habit"
+    ? "Skipping on purpose holds the streak. Leaving it open past midnight breaks it."
+    : b.kind==="fixture" ? "Fixtures are logged but never scored — no streak either way."
+    : "Press and hold the block on the timeline to drag it; drag the bars to resize.";
+  sheet("#shBlock");
+}
+function tick(id,date){
+  date=date||todayStr();
+  const list=dayBlocks(date), b=list.find(x=>x.id===id); if(!b) return;
+  mark();
+  if(b.done){ b.done=false; b.aStart=null; b.aDur=null; }
+  else{
+    b.done=true; b.skip=false;
+    const n=nowMin();
+    // logs what actually happened: if closed inside the window, that window stands
+    if(date===todayStr() && n>b.start && n<b.start+b.dur+180){ b.aStart=b.start; b.aDur=Math.max(5,Math.round(n-b.start)); }
+    else { b.aStart=b.start; b.aDur=b.dur; }
+  }
+  commit();
+  toast(b.done?"Marked done":"Reopened", b.done?"go":"");
+}
+$("#blkDone").addEventListener("click",()=>{ tick(curBlk,CUR); closeSheet(); });
+$("#blkSkip").addEventListener("click",()=>{
+  const b=findBlk(curBlk); if(!b) return;
+  mark(); b.skip=!b.skip; if(b.skip) b.done=false;
+  closeSheet(); commit(); toast(b.skip?"Skipped — streak held":"Unskipped");
+});
+$("#blkDel").addEventListener("click",()=>{
+  const b=findBlk(curBlk); if(!b) return;
+  ask("REMOVE BLOCK","Removes it from "+prettyDate(CUR)+" only. The item itself stays.",()=>{
+    mark(); const l=dayBlocks(CUR); l.splice(l.findIndex(x=>x.id===curBlk),1); commit(); toast("Removed");
+  });
+});
+$("#blkEdit").addEventListener("click",()=>{
+  const b=findBlk(curBlk); if(!b) return;
+  SEL=curBlk; closeSheet(); drawDay();
+  toast("Drag the block, or its bars, to adjust");
+});
+
+/* ---------- item editor ---------- */
+let editId=null;
+function openItem(id){
+  editId=id||null;
+  const it=id?S.items.find(i=>i.id===id):null;
+  $("#newTitle").textContent=it?"EDIT ITEM":"NEW ITEM";
+  $("#fKind").value=it?it.kind:"habit";
+  $("#fName").value=it?it.name:"";
+  $("#fDesc").value=it?(it.desc||""):"";
+  $("#fDate").value=it&&it.date?it.date:todayStr();
+  $("#fDl").value=it&&it.deadline?it.deadline:addDays(todayStr(),3);
+  $("#fStart").value=min2hm(it?it.start:420);
+  $("#fDur").value=it?it.dur:30;
+  const days=it&&it.days?it.days:[1,2,3,4,5];
+  $("#fDays").innerHTML=DOW.map((d,i)=>
+    `<button data-d="${i}" class="${days.includes(i)?"on":""}">${d[0]}</button>`).join("");
+  $("#fDelete").style.display=it?"block":"none";
+  kindUI(); sheet("#shNew");
+}
+function kindUI(){
+  const k=$("#fKind").value;
+  $("#wrapDays").style.display=(k==="habit"||k==="fixture")?"block":"none";
+  $("#wrapDate").style.display=(k==="appt")?"block":"none";
+  $("#wrapDl").style.display=(k==="task")?"block":"none";
+  $("#wrapStart").style.display=(k==="task")?"none":"block";
+  $("#labDur").textContent=(k==="task")?"ESTIMATED MINUTES":"MINUTES";
+}
+$("#fKind").addEventListener("change",kindUI);
+$("#newX").addEventListener("click",closeSheet);
+$("#fDays").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(b) b.classList.toggle("on");
+});
+$("#fSave").addEventListener("click",()=>{
+  const k=$("#fKind").value, name=$("#fName").value.trim();
+  if(!name) return toast("Give it a name","no");
+  const dur=clamp(parseInt($("#fDur").value)||30,5,1440);
+  const days=[...$("#fDays").querySelectorAll("button.on")].map(b=>+b.dataset.d);
+  mark();
+  let it=editId?S.items.find(i=>i.id===editId):null;
+  if(!it){ it={id:uid(),from:todayStr()}; S.items.push(it); }
+  it.kind=k; it.name=name; it.desc=$("#fDesc").value.trim(); it.dur=dur; it.archived=false;
+  if(k==="habit"||k==="fixture"){ it.days=days; it.start=hm2min($("#fStart").value); delete it.deadline; delete it.date; }
+  if(k==="task"){ it.deadline=$("#fDl").value; it.done=false; delete it.days; delete it.date; }
+  if(k==="appt"){ it.date=$("#fDate").value; it.start=hm2min($("#fStart").value); delete it.days; delete it.deadline; }
+  regenFuture(it.id);
+  closeSheet(); commit();
+  toast(editId?"Updated":(days.length||k!=="habit"&&k!=="fixture"?"Added":"Added to the pool"),"go");
+});
+$("#fDelete").addEventListener("click",()=>{
+  ask("DELETE ITEM","Removes the item and any future blocks. Completed history stays in the log.",()=>{
+    mark();
+    const t=todayStr();
+    for(const d in S.inst){ if(d<t) continue;
+      const l=S.inst[d]; for(let i=l.length-1;i>=0;i--) if(l[i].src===editId&&!l[i].done) l.splice(i,1); }
+    S.items.splice(S.items.findIndex(i=>i.id===editId),1);
+    commit(); toast("Deleted");
+  });
+});
+
+/* ---------- overlap ---------- */
+function showOverlap(list,ns,nd){
+  const names=list.slice(0,3).map(b=>b.name+" ("+fmtT(b.start)+")").join(", ");
+  $("#ovTxt").innerHTML=`<b>${fmtT(ns)}&#8202;&#8211;&#8202;${fmtT(ns+nd)}</b> runs into
+    ${list.length===1?"":list.length+" blocks: "}${esc(names)}${list.length>3?" and more":""}.`;
+  sheet("#shOver");
+}
+$("#ovKeep").addEventListener("click",()=>{
+  applyPending(false); closeSheet();
+});
+$("#ovSnap").addEventListener("click",()=>{
+  applyPending(true); closeSheet();
+});
+$("#ovCancel").addEventListener("click",()=>{ pendingMove=null; pendingNew=null; closeSheet(); draw(); });
+function applyPending(snapIt){
+  if(pendingMove){
+    const b=findBlk(pendingMove.bid); if(!b) return;
+    mark();
+    let s=pendingMove.ns;
+    if(snapIt) s=nextFree(CUR,pendingMove.nd,b.id,s);
+    b.start=s; b.dur=pendingMove.nd; b.moved=1;
+    pendingMove=null; commit(); toast(snapIt?"Snapped clear":"Kept — shown side by side");
+  } else if(pendingNew){
+    const p=pendingNew;
+    mark();
+    let s=p.start;
+    if(snapIt) s=nextFree(p.date,p.dur,null,s);
+    dayBlocks(p.date).push({id:uid(),src:p.src||null,kind:p.kind,name:p.name,desc:p.desc||"",
+      start:s,dur:p.dur,done:false,skip:false,aStart:null,aDur:null,moved:1});
+    if(p.src){ const it=S.items.find(i=>i.id===p.src); if(it&&it.kind==="task") it.placed=p.date; }
+    pendingNew=null; commit(); toast(snapIt?"Snapped clear":"Placed — side by side");
+  }
+}
+function nextFree(date,dur,ignore,from){
+  const bs=dayBlocks(date).filter(b=>b.id!==ignore).sort((a,b)=>a.start-b.start);
+  let c=from;
+  let guard=0;
+  while(guard++<300){
+    const hit=bs.find(b=>b.start<c+dur&&c<b.start+b.dur);
+    if(!hit) return clamp(c,0,1440-dur);
+    c=hit.start+hit.dur;
+    if(c+dur>1440) return clamp(from,0,1440-dur);
+  }
+  return from;
+}
+
+/* ---------- quick create from the timeline ---------- */
+function quickCreate(startMin){
+  pendingNew=null;
+  openItem(null);
+  $("#fKind").value="appt"; kindUI();          // a one-off block on this day
+  $("#fDate").value=CUR;
+  $("#fStart").value=min2hm(startMin);
+  $("#fName").value="";
+  $("#newTitle").textContent="NEW BLOCK \u00b7 "+fmtT(startMin);
+  toast("New block at "+fmtT(startMin));
+}
+
+/* ---------- gap finder / placement ---------- */
+let placeId=null;
+function openPlace(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  placeId=id;
+  $("#plNm").textContent="PLACE \u00b7 "+it.name.toUpperCase();
+  $("#plDate").value = it.deadline && it.deadline>=todayStr() ? todayStr() : todayStr();
+  $("#plDur").value=it.dur;
+  renderGaps();
+  sheet("#shPlace");
+}
+function renderGaps(){
+  const d=$("#plDate").value||todayStr();
+  const need=clamp(parseInt($("#plDur").value)||30,5,1440);
+  const gaps=findGaps(d,need);
+  $("#plGaps").innerHTML = gaps.length ? gaps.map(g=>`
+    <div class="row"><span class="tag">FREE</span>
+      <div class="m"><b>${fmtT(g.start)} &#8211; ${fmtT(g.start+g.dur)}</b><i>${fmtDur(g.dur)} OPEN</i></div>
+      <button class="mini go" data-gap="${g.start}">USE</button></div>`).join("")
+    : `<div class="empty"><b>NO OPEN SLOT THAT LONG</b>Set a time below and it will place anyway — you will get the overlap prompt.</div>`;
+}
+$("#plDate").addEventListener("change",renderGaps);
+$("#plDur").addEventListener("input",renderGaps);
+$("#plX").addEventListener("click",closeSheet);
+$("#plGaps").addEventListener("click",e=>{
+  const b=e.target.closest("[data-gap]"); if(!b) return;
+  $("#plTime").value=min2hm(+b.dataset.gap); doPlace();
+});
+$("#plGo").addEventListener("click",doPlace);
+function doPlace(){
+  const it=S.items.find(i=>i.id===placeId); if(!it) return;
+  const date=$("#plDate").value||todayStr();
+  const start=hm2min($("#plTime").value);
+  const dur=clamp(parseInt($("#plDur").value)||it.dur,5,1440);
+  ensureDay(date);
+  const o=overlapsIn(date,start,dur,null);
+  closeSheet();
+  pendingNew={date,start,dur,kind:it.kind,name:it.name,desc:it.desc,src:it.id};
+  if(o.length){ CUR=date; showOverlap(o,start,dur); }
+  else { applyPending(false); CUR=date; go("vDay"); }
+}
+
+/* ---------- copy yesterday ---------- */
+function copyYesterday(){
+  const src=addDays(CUR,-1), from=dayBlocks(src), to=dayBlocks(CUR);
+  const add=from.filter(b=>!to.some(x=>x.src&&x.src===b.src));
+  if(!add.length) return toast("Nothing new to copy");
+  ask("COPY YESTERDAY","Brings "+add.length+" block"+(add.length>1?"s":"")+" from "+prettyDate(src)+
+      " onto "+prettyDate(CUR)+", reset to not-done.",()=>{
+    mark();
+    for(const b of add) to.push({id:uid(),src:b.src,kind:b.kind,name:b.name,desc:b.desc,
+      start:b.start,dur:b.dur,done:false,skip:false,aStart:null,aDur:null,moved:1});
+    commit(); toast("Copied "+add.length+" block"+(add.length>1?"s":""),"go");
+  });
+}
+/* ============================ ZIP ============================
+   An .xlsx is a zip of xml. Written store-only, read with the browser's
+   own inflate — so nothing is downloaded and it all works offline. */
+function crc32(buf){
+  let T=crc32.T;
+  if(!T){ T=crc32.T=new Int32Array(256);
+    for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; T[n]=c; } }
+  let c=-1;
+  for(let i=0;i<buf.length;i++) c=(c>>>8)^T[(c^buf[i])&255];
+  return (c^-1)>>>0;
+}
+function zipStore(files){
+  const enc=new TextEncoder(), parts=[], cd=[]; let off=0;
+  for(const f of files){
+    const nb=enc.encode(f.name), data=f.data, crc=crc32(data);
+    const lh=new Uint8Array(30+nb.length), lv=new DataView(lh.buffer);
+    lv.setUint32(0,0x04034b50,true); lv.setUint16(4,20,true); lv.setUint16(8,0,true);
+    lv.setUint16(12,0x21,true); lv.setUint32(14,crc,true);
+    lv.setUint32(18,data.length,true); lv.setUint32(22,data.length,true);
+    lv.setUint16(26,nb.length,true); lh.set(nb,30);
+    parts.push(lh,data);
+    const ch=new Uint8Array(46+nb.length), cv=new DataView(ch.buffer);
+    cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint16(14,0x21,true); cv.setUint32(16,crc,true);
+    cv.setUint32(20,data.length,true); cv.setUint32(24,data.length,true);
+    cv.setUint16(28,nb.length,true); cv.setUint32(42,off,true); ch.set(nb,46);
+    cd.push(ch); off+=lh.length+data.length;
+  }
+  let cdLen=0; for(const c of cd) cdLen+=c.length;
+  const eo=new Uint8Array(22), ev=new DataView(eo.buffer);
+  ev.setUint32(0,0x06054b50,true); ev.setUint16(8,cd.length,true); ev.setUint16(10,cd.length,true);
+  ev.setUint32(12,cdLen,true); ev.setUint32(16,off,true);
+  return new Blob([...parts,...cd,eo],
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+async function inflateRaw(raw){
+  if(typeof DecompressionStream==="undefined")
+    throw new Error("This browser can't unzip .xlsx — use a JSON snapshot instead");
+  const ds=new DecompressionStream("deflate-raw"), wr=ds.writable.getWriter();
+  wr.write(raw); wr.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+async function unzip(ab){
+  const u=new Uint8Array(ab), dv=new DataView(ab);
+  let e=-1;
+  for(let i=u.length-22;i>=Math.max(0,u.length-66000);i--) if(dv.getUint32(i,true)===0x06054b50){e=i;break;}
+  if(e<0) throw new Error("That file is not a readable .xlsx");
+  const n=dv.getUint16(e+10,true); let p=dv.getUint32(e+16,true);
+  const out={}, td=new TextDecoder();
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true);
+    const nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true);
+    const lho=dv.getUint32(p+42,true);
+    const name=td.decode(u.subarray(p+46,p+46+nl));
+    const ds=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true);
+    const raw=u.subarray(ds,ds+csize);
+    out[name]= method===0 ? raw : await inflateRaw(raw);
+    p+=46+nl+el+cl;
+  }
+  return out;
+}
+/* ============================ XLSX ============================ */
+const xesc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function colName(i){ let s=""; i++; while(i>0){ const r=(i-1)%26; s=String.fromCharCode(65+r)+s; i=(i-r-1)/26; } return s; }
+function colIdx(ref){ const m=/^([A-Z]+)/.exec(ref); if(!m) return 0;
+  let n=0; for(const ch of m[1]) n=n*26+(ch.charCodeAt(0)-64); return n-1; }
+function sheetXml(rows){
+  let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+  rows.forEach((row,ri)=>{
+    x+='<row r="'+(ri+1)+'">';
+    row.forEach((v,ci)=>{
+      if(v===null||v===undefined||v==="") return;
+      const r=colName(ci)+(ri+1);
+      if(typeof v==="number"&&isFinite(v)) x+='<c r="'+r+'"><v>'+v+'</v></c>';
+      else x+='<c r="'+r+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>';
+    });
+    x+='</row>';
+  });
+  return x+'</sheetData></worksheet>';
+}
+function buildXlsx(sheets){
+  const enc=new TextEncoder(), B=s=>enc.encode(s);
+  const names=sheets.map(s=>s.name);
+  const files=[
+    {name:"[Content_Types].xml",data:B('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+      names.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+
+        '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("")+
+      '</Types>')},
+    {name:"_rels/.rels",data:B('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
+      '</Relationships>')},
+    {name:"xl/workbook.xml",data:B('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '+
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+
+      names.map((n,i)=>'<sheet name="'+xesc(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join("")+
+      '</sheets></workbook>')},
+    {name:"xl/_rels/workbook.xml.rels",data:B('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      names.map((_,i)=>'<Relationship Id="rId'+(i+1)+
+        '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+
+        (i+1)+'.xml"/>').join("")+'</Relationships>')}
+  ];
+  sheets.forEach((s,i)=>files.push({name:"xl/worksheets/sheet"+(i+1)+".xml",data:B(sheetXml(s.rows))}));
+  return zipStore(files);
+}
+async function readXlsx(ab){
+  const z=await unzip(ab), td=new TextDecoder(), P=new DOMParser();
+  const get=n=>z[n]?td.decode(z[n]):null;
+  const shared=[];
+  const ss=get("xl/sharedStrings.xml");
+  if(ss){ const d=P.parseFromString(ss,"application/xml");
+    for(const si of d.getElementsByTagName("si")){
+      let s=""; for(const t of si.getElementsByTagName("t")) s+=t.textContent; shared.push(s); } }
+  const wb=P.parseFromString(get("xl/workbook.xml")||"<x/>","application/xml");
+  const rels=P.parseFromString(get("xl/_rels/workbook.xml.rels")||"<x/>","application/xml");
+  const rmap={};
+  for(const r of rels.getElementsByTagName("Relationship")) rmap[r.getAttribute("Id")]=r.getAttribute("Target");
+  const out={};
+  let idx=0;
+  for(const sh of wb.getElementsByTagName("sheet")){
+    idx++;
+    const nm=sh.getAttribute("name");
+    const rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+    let tgt=rmap[rid]||("worksheets/sheet"+idx+".xml");
+    tgt=tgt.replace(/^\/?xl\//,""); 
+    const xml=get("xl/"+tgt)||get("xl/worksheets/sheet"+idx+".xml");
+    if(!xml) continue;
+    const d=P.parseFromString(xml,"application/xml"), rows=[];
+    for(const r of d.getElementsByTagName("row")){
+      const ri=(+r.getAttribute("r"))-1, arr=rows[ri]=rows[ri]||[];
+      for(const c of r.getElementsByTagName("c")){
+        const ci=colIdx(c.getAttribute("r")||"A"), t=c.getAttribute("t");
+        let v=null;
+        if(t==="inlineStr"){ v=""; for(const x of c.getElementsByTagName("t")) v+=x.textContent; }
+        else { const ve=c.getElementsByTagName("v")[0]; if(ve){ v=ve.textContent;
+          if(t==="s") v=shared[+v]!==undefined?shared[+v]:""; else if(!t||t==="n") v=+v; } }
+        arr[ci]=v;
+      }
+    }
+    out[nm]=rows;
+  }
+  return out;
+}
+/* tolerant coercion — people type what they type */
+function asDate(v){
+  if(v==null||v==="") return "";
+  if(typeof v==="number"){ const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);
+    return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
+  const s=String(v).trim();
+  let m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s); if(m) return m[1]+"-"+pad(+m[2])+"-"+pad(+m[3]);
+  m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s); if(m) return m[3]+"-"+pad(+m[1])+"-"+pad(+m[2]);
+  const d=new Date(s); return isNaN(d)?"":ymd(d);
+}
+function asTime(v){
+  if(v==null||v==="") return null;
+  if(typeof v==="number") return Math.round((v%1)*1440);
+  const s=String(v).trim();
+  let m=/^(\d{1,2}):(\d{2})\s*(am|pm)?/i.exec(s);
+  if(m){ let h=+m[1]; const mi=+m[2], ap=(m[3]||"").toLowerCase();
+    if(ap==="pm"&&h<12) h+=12; if(ap==="am"&&h===12) h=0; return h*60+mi; }
+  m=/^(\d{1,2})\s*(am|pm)$/i.exec(s);
+  if(m){ let h=+m[1]; if(/pm/i.test(m[2])&&h<12) h+=12; if(/am/i.test(m[2])&&h===12) h=0; return h*60; }
+  return null;
+}
+function asDays(v){
+  if(v==null||v==="") return [];
+  const s=String(v).toUpperCase();
+  if(/^(ALL|EVERY|DAILY)/.test(s)) return [0,1,2,3,4,5,6];
+  const out=new Set();
+  for(const tok of s.split(/[,;/\s]+/)){
+    if(!tok) continue;
+    if(/^\d$/.test(tok)&&+tok<=6){ out.add(+tok); continue; }
+    const i=DOW.findIndex(d=>tok.startsWith(d.slice(0,3)));
+    if(i>=0) out.add(i);
+  }
+  return [...out].sort();
+}
+const asBool=v=>{ const s=String(v==null?"":v).trim().toUpperCase();
+  return s==="TRUE"||s==="YES"||s==="Y"||s==="1"||s==="DONE"||s==="X"; };
+const daysStr=d=>!d||!d.length?"":d.length===7?"ALL":d.map(i=>DOW[i]).join(",");
+
+/* ---------- model -> workbook ---------- */
+function exportXlsx(){
+  const rec=k=>S.items.filter(i=>i.kind===k&&!i.archived);
+  const log=[["Date","Item","Kind","Planned Start","Planned Min","Actual Start","Actual Min","Status","ItemID"]];
+  for(const d of Object.keys(S.inst).sort()) for(const b of S.inst[d])
+    log.push([d,b.name,b.kind,min2hm(b.start),b.dur,b.aStart!=null?min2hm(b.aStart):"",
+      b.aDur!=null?b.aDur:"",b.done?"DONE":b.skip?"SKIPPED":(d<todayStr()?"MISSED":"OPEN"),b.src||""]);
+  const sheets=[
+    {name:"README",rows:[
+      ["SCHED WORKBOOK"],[],
+      ["This file is the round trip. Export it, edit it, import it back."],
+      ["Rows match on ID, so re-importing an edited sheet updates rather than duplicates."],
+      ["Leave ID blank on a new row and one gets assigned on import."],[],
+      ["SHEET","WHAT IT HOLDS"],
+      ["Habits","Recurring and streak tracked. Missing a day breaks the streak."],
+      ["Fixtures","Recurring but never scored. Commute, meals, standing meetings."],
+      ["Tasks","One off, has a deadline. Waits in the pool until placed on a day."],
+      ["Appointments","Fixed to a single date and time."],
+      ["Log","One row per block per day. This is the sheet to pivot for analysis."],[],
+      ["COLUMN","ACCEPTED VALUES"],
+      ["Days","MON,WED,FRI  or  ALL  or  0-6 where 0 is Sunday. Blank = irregular, waits in the pool."],
+      ["Start","07:00 or 7:00am. 24h or 12h both read fine."],
+      ["Minutes","Whole number. Length of the block."],
+      ["Deadline","2026-08-01 or 8/1/2026."],
+      ["Active / Done","TRUE or FALSE. YES, Y, 1 and X also read as true."],
+      ["Status","DONE, SKIPPED, MISSED or OPEN. Editing this on import rewrites history."],[],
+      ["Exported",new Date().toISOString().slice(0,19).replace("T"," ")]
+    ]},
+    {name:"Habits",rows:[["ID","Name","Description","Days","Start","Minutes","Active"],
+      ...rec("habit").map(i=>[i.id,i.name,i.desc||"",daysStr(i.days),min2hm(i.start),i.dur,"TRUE"])]},
+    {name:"Fixtures",rows:[["ID","Name","Description","Days","Start","Minutes","Active"],
+      ...rec("fixture").map(i=>[i.id,i.name,i.desc||"",daysStr(i.days),min2hm(i.start),i.dur,"TRUE"])]},
+    {name:"Tasks",rows:[["ID","Name","Description","Deadline","Minutes","Done"],
+      ...rec("task").map(i=>[i.id,i.name,i.desc||"",i.deadline||"",i.dur,i.done?"TRUE":"FALSE"])]},
+    {name:"Appointments",rows:[["ID","Name","Description","Date","Start","Minutes"],
+      ...rec("appt").map(i=>[i.id,i.name,i.desc||"",i.date||"",min2hm(i.start),i.dur])]},
+    {name:"Log",rows:log}
+  ];
+  dl(buildXlsx(sheets),"sched-"+todayStr()+".xlsx");
+  mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag();
+  toast("Workbook exported","go");
+}
+function dl(blob,name){
+  const u=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=u; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(u); a.remove(); },400);
+}
+
+/* ---------- workbook -> model ---------- */
+/* field-order-independent signature, so "updated" means actually changed */
+const sig=o=>JSON.stringify([o.kind,o.name||"",o.desc||"",o.dur|0,(o.days||[]).join(","),
+  o.start==null?"":o.start,o.deadline||"",o.date||"",!!o.done,!!o.archived]);
+let pendingImport=null;
+async function importXlsx(file){
+  const wb=await readXlsx(await file.arrayBuffer());
+  const errs=[], plan={items:[],log:[]}, seen={n:0,u:0,s:0};
+  const head=rows=>{
+    if(!rows||!rows.length) return null;
+    const h=(rows[0]||[]).map(x=>String(x==null?"":x).trim().toLowerCase());
+    return {h,i:n=>h.indexOf(n)};
+  };
+  const grab=(sheet,kind)=>{
+    const rows=wb[sheet]; if(!rows) return;
+    const H=head(rows); if(!H) return;
+    for(let r=1;r<rows.length;r++){
+      const row=rows[r]||[]; if(!row.length) continue;
+      const g=n=>{ const i=H.i(n); return i<0?null:row[i]; };
+      const name=String(g("name")||"").trim();
+      if(!name) continue;
+      const id=String(g("id")||"").trim();
+      const dur=parseInt(g("minutes"))||30;
+      const it={id:id||uid(),kind,name,desc:String(g("description")||"").trim(),dur,archived:false};
+      if(kind==="habit"||kind==="fixture"){
+        it.days=asDays(g("days"));
+        const st=asTime(g("start")); if(st==null&&it.days.length) errs.push(sheet+" row "+(r+1)+": start time unreadable, using 07:00");
+        it.start=st==null?420:st;
+        if(H.i("active")>=0 && g("active")!=null && String(g("active")).trim()!=="" && !asBool(g("active"))) it.archived=true;
+      }
+      if(kind==="task"){
+        it.deadline=asDate(g("deadline"));
+        if(!it.deadline) errs.push(sheet+" row "+(r+1)+": no readable deadline");
+        it.done=asBool(g("done")); it.start=540;
+      }
+      if(kind==="appt"){
+        it.date=asDate(g("date"));
+        if(!it.date){ errs.push(sheet+" row "+(r+1)+": no readable date, row skipped"); continue; }
+        const st=asTime(g("start")); it.start=st==null?540:st;
+      }
+      const ex=S.items.find(x=>x.id===it.id);
+      if(!ex) seen.n++;
+      else if(sig(ex)!==sig(it)) seen.u++;
+      else seen.s++;
+      plan.items.push(it);
+    }
+  };
+  grab("Habits","habit"); grab("Fixtures","fixture"); grab("Tasks","task"); grab("Appointments","appt");
+
+  const lr=wb["Log"];
+  if(lr&&lr.length>1){
+    const H=head(lr);
+    for(let r=1;r<lr.length;r++){
+      const row=lr[r]||[]; const g=n=>{ const i=H.i(n); return i<0?null:row[i]; };
+      const d=asDate(g("date")), nm=String(g("item")||"").trim();
+      if(!d||!nm) continue;
+      const st=asTime(g("planned start"));
+      plan.log.push({date:d,name:nm,kind:String(g("kind")||"fixture").trim().toLowerCase(),
+        start:st==null?540:st,dur:parseInt(g("planned min"))||30,
+        aStart:asTime(g("actual start")),aDur:parseInt(g("actual min"))||null,
+        status:String(g("status")||"OPEN").trim().toUpperCase(),src:String(g("itemid")||"").trim()});
+    }
+  }
+  pendingImport=plan;
+  $("#impDiff").innerHTML=`
+    <div class="ok"><span>NEW ITEMS</span><b>${seen.n}</b></div>
+    <div class="up"><span>UPDATED</span><b>${seen.u}</b></div>
+    <div><span>UNCHANGED</span><b>${seen.s}</b></div>
+    <div><span>LOG ROWS</span><b>${plan.log.length}</b></div>
+    ${errs.length?`<div class="er"><span>ROWS WITH PROBLEMS</span><b>${errs.length}</b></div>`:""}`;
+  const eb=$("#impErr");
+  if(errs.length){ eb.style.display="block"; eb.innerHTML=errs.slice(0,40).map(esc).join("<br>"); }
+  else eb.style.display="none";
+  sheet("#shImp");
+}
+$("#impGo").addEventListener("click",()=>{
+  if(!pendingImport) return;
+  mark();
+  for(const it of pendingImport.items){
+    const i=S.items.findIndex(x=>x.id===it.id);
+    if(i<0){ it.from=todayStr(); S.items.push(it); } else S.items[i]={...S.items[i],...it};
+  }
+  for(const l of pendingImport.log){
+    const list=S.inst[l.date]||(S.inst[l.date]=[]);
+    S.gen[l.date]=1;
+    let b=list.find(x=>(l.src&&x.src===l.src)||x.name===l.name);
+    if(!b){ b={id:uid(),src:l.src||null,kind:l.kind,name:l.name,desc:"",start:l.start,dur:l.dur,
+      done:false,skip:false,aStart:null,aDur:null}; list.push(b); }
+    b.start=l.start; b.dur=l.dur;
+    b.done=l.status==="DONE"; b.skip=l.status==="SKIPPED";
+    b.aStart=l.aStart; b.aDur=l.aDur;
+  }
+  _earliest=null;
+  for(const it of pendingImport.items) regenFuture(it.id);
+  pendingImport=null; closeSheet(); commit();
+  toast("Workbook imported","go");
+});
+$("#impNo").addEventListener("click",()=>{ pendingImport=null; closeSheet(); });
+$("#iX").addEventListener("click",()=>{ pendingImport=null; closeSheet(); });
+
+/* ---------- json snapshot ---------- */
+function exportJson(){
+  dl(new Blob([JSON.stringify(S)],{type:"application/json"}),"sched-snapshot-"+todayStr()+".json");
+  mark(); S.cfg.lastExp=Date.now(); commit(false); syncUndo(); checkNag();
+  toast("Snapshot saved","go");
+}
+async function importJson(file){
+  const txt=await file.text(); const o=JSON.parse(txt);
+  if(!o||!o.items) throw new Error("Not a SCHED snapshot");
+  ask("RESTORE SNAPSHOT","Replaces everything currently in the app with the contents of this file. Undo will still bring it back.",()=>{
+    mark(); S=o;
+    if(!S.cfg) S.cfg=JSON.parse(JSON.stringify(FRESH.cfg));
+    for(const k in FRESH.cfg) if(S.cfg[k]===undefined) S.cfg[k]=FRESH.cfg[k];
+    _earliest=null; commit(); toast("Restored","go");
+  });
+}
+
+/* ---------- export nag ---------- */
+function checkNag(){
+  const n=$("#nag"), d=S.cfg.nagDays;
+  if(!d){ n.classList.remove("on"); return; }
+  const last=S.cfg.lastExp;
+  const days=last?Math.floor((Date.now()-last)/864e5):999;
+  if(days>=d && S.items.length){
+    $("#nagT").textContent = last
+      ? "Last backup "+days+" days ago. Browser storage is not permanent."
+      : "No backup yet. Browser storage can be cleared by Android.";
+    n.classList.add("on");
+  } else n.classList.remove("on");
+}
+$("#nagGo").addEventListener("click",()=>{ exportXlsx(); });
+$("#nagX").addEventListener("click",()=>{ $("#nag").classList.remove("on"); });
+
+/* ============================ WIRING ============================ */
+$$("#nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
+$("#bUndo").addEventListener("click",undo);
+$("#bRedo").addEventListener("click",redo);
+$("#bMenu").addEventListener("click",()=>{
+  $("#mRoll").value=min2hm(S.cfg.roll); $("#mNag").value=S.cfg.nagDays;
+  const last=S.cfg.lastExp?Math.floor((Date.now()-S.cfg.lastExp)/864e5):null;
+  $("#mStore").innerHTML= storeMode==="local"
+    ? `Saving to this device. Last backup: ${last===null?"never":last===0?"today":last+" days ago"}.`
+    : `<span style="color:var(--amber)">Running without device storage — this preview keeps data in memory only. Export before you close it.</span>`;
+  sheet("#shMenu");
+});
+$("#mX").addEventListener("click",closeSheet);
+$("#ctx").addEventListener("click",()=>{ if(VIEW==="vDay"){ CUR=todayStr(); draw(); scrollToNow(true); } else go("vDay"); });
+$("#bFmt").addEventListener("click",()=>{ S.cfg.fmt24=!S.cfg.fmt24; Store.write(S); draw(); });
+$("#bNow").addEventListener("click",()=>{ CUR=todayStr(); draw(); scrollToNow(true); });
+$("#zoom").addEventListener("input",e=>{ S.cfg.zoom=+e.target.value; drawDay(); });
+$("#zoom").addEventListener("change",()=>Store.write(S));
+$("#pAdd").addEventListener("click",()=>openItem(null));
+$("#pCopy").addEventListener("click",copyYesterday);
+$("#wkPrev").addEventListener("click",()=>{ WKB=addDays(WKB,-7); draw(); });
+$("#wkNext").addEventListener("click",()=>{ WKB=addDays(WKB,7); draw(); });
+$("#wkThis").addEventListener("click",()=>{ WKB=todayStr(); draw(); });
+$("#moPrev").addEventListener("click",()=>{ const d=parseYmd(MOB); d.setDate(1); d.setMonth(d.getMonth()-1); MOB=ymd(d); draw(); });
+$("#moNext").addEventListener("click",()=>{ const d=parseYmd(MOB); d.setDate(1); d.setMonth(d.getMonth()+1); MOB=ymd(d); draw(); });
+$("#moThis").addEventListener("click",()=>{ MOB=todayStr(); draw(); });
+$("#wkBody").addEventListener("click",e=>{ const c=e.target.closest(".wkc"); if(c){ CUR=c.dataset.d; go("vDay"); } });
+$("#moGrid").addEventListener("click",e=>{ const c=e.target.closest(".mc"); if(c){ CUR=c.dataset.d; go("vDay"); } });
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tick]"); if(t){ tick(t.dataset.tick,todayStr()); return; }
+  const p=e.target.closest("[data-place]"); if(p){ openPlace(p.dataset.place); return; }
+  const ed=e.target.closest("[data-edit]"); if(ed){ openItem(ed.dataset.edit); return; }
+});
+$("#mRoll").addEventListener("change",e=>{ mark(); S.cfg.roll=hm2min(e.target.value); commit(); });
+$("#mNag").addEventListener("change",e=>{ S.cfg.nagDays=clamp(parseInt(e.target.value)||0,0,90); Store.write(S); checkNag(); });
+$("#mWipe").addEventListener("click",()=>{
+  ask("ERASE ALL DATA","Everything goes. Export first if you want it back. Undo can still recover it this session.",()=>{
+    mark(); S=JSON.parse(JSON.stringify(FRESH)); _earliest=null; commit(); toast("Erased");
+  });
+});
+let fileMode="xlsx";
+$("#mXlsxOut").addEventListener("click",exportXlsx);
+$("#mJsonOut").addEventListener("click",exportJson);
+$("#mXlsxIn").addEventListener("click",()=>{ fileMode="xlsx"; $("#fileIn").accept=".xlsx"; $("#fileIn").click(); });
+$("#mJsonIn").addEventListener("click",()=>{ fileMode="json"; $("#fileIn").accept=".json"; $("#fileIn").click(); });
+$("#fileIn").addEventListener("change",async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  e.target.value="";
+  try{ closeSheet(); if(fileMode==="xlsx") await importXlsx(f); else await importJson(f); }
+  catch(err){ toast(err.message||"Could not read that file","no"); }
+});
+window.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="z"){ e.preventDefault(); e.shiftKey?redo():undo(); }
+  if((e.ctrlKey||e.metaKey)&&e.key==="y"){ e.preventDefault(); redo(); }
+  if(e.key==="Escape") closeSheet();
+});
+window.addEventListener("resize",()=>{ if(VIEW==="vDay") drawDay(); });
+setInterval(()=>{ if(VIEW==="vDay"&&CUR===todayStr()) drawDay(); },60000);
+
+/* ============================ BOOT ============================ */
+if("serviceWorker" in navigator && location.protocol.startsWith("http"))
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+
+if(!S.items.length && !Object.keys(S.inst).length){
+  // a small starting frame, so the first screen is not four empty boxes
+  const seed=[
+    {kind:"habit",name:"Morning lift",days:[1,3,5],start:390,dur:75,desc:"Compound focus. Log the top set."},
+    {kind:"habit",name:"Read 20 pages",days:[0,1,2,3,4,5,6],start:1290,dur:30,desc:""},
+    {kind:"fixture",name:"Commute in",days:[1,2,3,4,5],start:510,dur:45,desc:""},
+    {kind:"fixture",name:"Dinner",days:[0,1,2,3,4,5,6],start:1110,dur:60,desc:""}
+  ];
+  for(const s of seed) S.items.push({id:uid(),from:todayStr(),archived:false,...s});
+  Store.write(S);
+}
+primeWeek(); syncUndo(); go("vStreak");
+setTimeout(()=>scrollToNow(false),80);
+</script>
+</body>
+</html>
