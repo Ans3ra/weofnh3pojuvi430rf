@@ -476,7 +476,15 @@ main{flex:1;position:relative;overflow:hidden}
 <div class="sheet" id="shMenu"><div class="grab"></div>
   <div class="sh"><b>SYSTEM</b><button class="ico" id="mX">&#10005;</button></div>
   <div id="mStore" class="note" style="margin-bottom:13px"></div>
-  <div class="eyebrow">SPREADSHEET</div>
+  <div id="mInstallWrap" style="display:none">
+    <div class="eyebrow">INSTALL</div>
+    <button class="btn pri" id="mInstall">INSTALL TO HOME SCREEN</button>
+    <p class="note">Runs full screen with its own icon.</p>
+  </div>
+  <div class="eyebrow" style="margin-top:17px">DIAGNOSTICS</div>
+  <button class="btn gh" id="mDiag">CHECK WHY INSTALL IS UNAVAILABLE</button>
+  <div id="mDiagOut" style="display:none"></div>
+  <div class="eyebrow" style="margin-top:17px">SPREADSHEET</div>
   <button class="btn" id="mXlsxOut">EXPORT WORKBOOK &#183; .XLSX</button>
   <button class="btn" id="mXlsxIn">IMPORT WORKBOOK</button>
   <p class="note">The workbook is the round trip. Export, edit in Excel, import back — rows match on ID so nothing duplicates.</p>
@@ -1755,10 +1763,106 @@ window.addEventListener("keydown",e=>{
 window.addEventListener("resize",()=>{ if(VIEW==="vDay") drawDay(); });
 setInterval(()=>{ if(VIEW==="vDay"&&CUR===todayStr()) drawDay(); },60000);
 
-/* ============================ BOOT ============================ */
-if("serviceWorker" in navigator && location.protocol.startsWith("http"))
-  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+/* ============================ INSTALL / DIAGNOSTICS ============================ */
+let swState="not started", swErr=null, bipFired=false, bipEvent=null;
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  navigator.serviceWorker.register("./sw.js")
+    .then(r=>{ swState="registered";
+      if(r.installing) swState="installing"; else if(r.waiting) swState="waiting";
+      else if(r.active) swState="active";
+      return navigator.serviceWorker.ready.then(()=>{ swState="active"; }); })
+    .catch(e=>{ swState="FAILED"; swErr=e.message; });
+} else swState = location.protocol==="https:" ? "unsupported by this browser" : "needs https (currently "+location.protocol+")";
 
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); bipEvent=e; bipFired=true;
+  const w=$("#mInstallWrap"); if(w) w.style.display="block";
+});
+window.addEventListener("appinstalled",()=>{ toast("Installed","go"); });
+
+async function diagnose(){
+  const out=$("#mDiagOut"); out.style.display="block";
+  out.innerHTML=`<p class="note">Checking…</p>`;
+  const rows=[];
+  const R=(label,ok,detail)=>rows.push({label,ok,detail:detail||""});
+  const head=document.querySelector('link[rel="manifest"]');
+  const manURL=head?new URL(head.getAttribute("href"),location.href).href:null;
+
+  R("Served over HTTPS", location.protocol==="https:", location.protocol);
+  R("Page URL", true, location.href);
+
+  let man=null;
+  if(!manURL) R("Manifest tag present", false, "no <link rel=manifest>");
+  else{
+    try{
+      const r=await fetch(manURL,{cache:"no-store"});
+      if(!r.ok){ R("Manifest loads", false, "HTTP "+r.status+" at "+manURL); }
+      else{
+        const txt=await r.text();
+        try{ man=JSON.parse(txt); R("Manifest loads and parses", true, manURL); }
+        catch(e){ R("Manifest is valid JSON", false, "parse error: "+e.message); }
+      }
+    }catch(e){ R("Manifest loads", false, e.message); }
+  }
+  if(man){
+    R("Has name", !!(man.name||man.short_name), man.name||man.short_name||"missing");
+    R("display is standalone/fullscreen",
+      ["standalone","fullscreen","minimal-ui"].includes(man.display), man.display||"missing");
+    // start_url must resolve AND be fetchable — a dead start_url makes a dead icon
+    if(man.start_url){
+      const su=new URL(man.start_url,manURL).href;
+      try{ const r=await fetch(su,{cache:"no-store"});
+        R("start_url loads", r.ok, (r.ok?"":"HTTP "+r.status+" — ")+su); }
+      catch(e){ R("start_url loads", false, su+" — "+e.message); }
+    } else R("start_url present", false, "missing");
+    // every icon must actually download
+    const icons=man.icons||[];
+    R("Declares icons", icons.length>0, icons.length+" listed");
+    for(const ic of icons){
+      const iu=new URL(ic.src,manURL).href;
+      try{ const r=await fetch(iu,{cache:"no-store"});
+        R("Icon "+(ic.sizes||"?")+" loads", r.ok, (r.ok?"":"HTTP "+r.status+" — ")+iu); }
+      catch(e){ R("Icon "+(ic.sizes||"?")+" loads", false, iu+" — "+e.message); }
+    }
+  }
+  // service worker
+  let regs=[];
+  try{ regs=await navigator.serviceWorker.getRegistrations(); }catch(e){}
+  R("Service worker registered", regs.length>0, swErr?("error: "+swErr):(swState+", "+regs.length+" registration(s)"));
+  if(regs.length){
+    const r=regs[0];
+    R("Worker is active", !!r.active, r.active?("scope "+r.scope):"still installing or failed");
+  }
+  const standalone = window.matchMedia("(display-mode: standalone)").matches ||
+                     window.navigator.standalone===true;
+  R("Currently running installed", standalone, standalone?"yes — that's why install is hidden":"no, running in browser tab");
+  R("Browser offered install", bipFired, bipFired?"yes — use the button above":"event has not fired");
+
+  const bad=rows.filter(r=>!r.ok && r.label!=="Browser offered install" && r.label!=="Currently running installed");
+  out.innerHTML =
+    `<div class="diff">`+rows.map(r=>
+      `<div class="${r.ok?"ok":"er"}"><span style="flex:1;min-width:0">${esc(r.label)}
+        ${r.detail?`<br><span style="color:var(--faint);font-size:9.5px;word-break:break-all">${esc(r.detail)}</span>`:""}</span>
+        <b>${r.ok?"OK":"FAIL"}</b></div>`).join("")+`</div>`+
+    (bad.length
+      ? `<div class="warnbox"><b>BLOCKING INSTALL</b><br>${bad.map(b=>esc(b.label)).join("<br>")}</div>`
+      : bipFired
+        ? `<p class="note" style="color:var(--green)">Everything passes. Use the install button above.</p>`
+        : `<p class="note warn">Everything required passes, but the browser has not offered install yet.
+           Usually it needs a second visit, or an old install of this app still exists on the device —
+           remove that icon, then reload. On desktop Chrome the option lives in the address bar,
+           or under the menu in "Cast, save and share".</p>`);
+}
+$("#mDiag").addEventListener("click",diagnose);
+$("#mInstall").addEventListener("click",async()=>{
+  if(!bipEvent) return toast("No install offer available","no");
+  bipEvent.prompt();
+  const c=await bipEvent.userChoice;
+  bipEvent=null; $("#mInstallWrap").style.display="none";
+  toast(c.outcome==="accepted"?"Installing…":"Install dismissed", c.outcome==="accepted"?"go":"");
+});
+
+/* ============================ BOOT ============================ */
 if(!S.items.length && !Object.keys(S.inst).length){
   // a small starting frame, so the first screen is not four empty boxes
   const seed=[
