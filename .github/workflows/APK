@@ -1,13 +1,16 @@
 name: Build APK
 
-# Everything the Android build needs is embedded in this one file, so the repo
-# only ever holds your web files. Nothing to unpack, no nested folders to make.
+# One file, no secrets, no setup. Everything the Android build needs is
+# embedded here: the project source and the signing key.
 #
-# Run "Make Keystore" once before the first build, or the apk comes out
-# unsigned and Android will refuse to install it.
+# About that key: it is a self-signed certificate baked into this file. For a
+# personal app that is fine - its only job is to stay the same between builds,
+# because Android refuses to update an installed app if the signature changes.
+# It is not a Play Store credential and guards nothing. If you would rather use
+# your own, set a KEYSTORE_B64 secret and it takes priority over this one.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
     paths:
       - "index.html"
       - "sw.js"
@@ -85,26 +88,30 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Restore signing key
+      - name: Signing key
         id: keystore
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          OWN_KEY: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [ -z "$KEYSTORE_B64" ]; then
-            echo "have_key=no" >> $GITHUB_OUTPUT
-            echo "::warning::No KEYSTORE_B64 secret - the apk will be unsigned and will not install. Run Make Keystore first."
+          if [ -n "$OWN_KEY" ]; then
+            echo "$OWN_KEY" | base64 -d > $RUNNER_TEMP/release.jks
+            echo "using your own KEYSTORE_B64 secret"
+            echo "pw=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_OUTPUT
+            echo "alias=${{ secrets.KEY_ALIAS }}" >> $GITHUB_OUTPUT
           else
-            echo "$KEYSTORE_B64" | base64 -d > $RUNNER_TEMP/release.jks
-            echo "have_key=yes" >> $GITHUB_OUTPUT
+            echo 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 | base64 -d > $RUNNER_TEMP/release.jks
+            echo "using the built-in key"
+            echo "pw=hubsched2026" >> $GITHUB_OUTPUT
+            echo "alias=schedule" >> $GITHUB_OUTPUT
           fi
 
       - name: Build
         working-directory: android
         env:
-          KEYSTORE_PATH: ${{ steps.keystore.outputs.have_key == 'yes' && format('{0}/release.jks', runner.temp) || '' }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.pw }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
+          KEY_PASSWORD: ${{ steps.keystore.outputs.pw }}
         run: |
           gradle wrapper --gradle-version 8.9
           ./gradlew assembleRelease --no-daemon -Pvcode=${{ github.run_number }} -Pvname=1.${{ github.run_number }}
@@ -124,12 +131,11 @@ jobs:
           retention-days: 90
 
       - name: Publish release
-        if: steps.keystore.outputs.have_key == 'yes'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.${{ github.run_number }}
           name: SCHEDULE 1.${{ github.run_number }}
           body: |
             Built from index.html at ${{ github.sha }} - ${{ steps.apk.outputs.size }}.
-            Tap the .apk file below on your phone to install.
+            Tap the .apk file below on your phone to install it.
           files: schedule-hub.apk
