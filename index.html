@@ -724,8 +724,8 @@ main{flex:1;position:relative;overflow:hidden}
     <div class="eyebrow" style="margin-top:18px">PERCEPTION VS MEASUREMENT</div>
     <div id="physDiv"></div>
     <p class="note" style="margin-top:12px">100 is your ideal, not a standard, so nothing here compares you
-      to anyone. Size counts distance from 100 in either direction; harmony reads the raw spread, because
-      one group over while another is under is a real proportional mismatch.</p>
+      to anyone. Size counts distance from 100 in either direction; alignment reads the spread relative to
+      level, because one group over while another is under is a real proportional mismatch.</p>
   </div></section>
 
   <!-- MEALS: DAY -->
@@ -802,7 +802,7 @@ main{flex:1;position:relative;overflow:hidden}
   <button data-v="vPatterns"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16 6.6 9.4l3.4 3.2 4-7.4"/><circle cx="6.6" cy="9.4" r="1.3"/><circle cx="10" cy="12.6" r="1.3"/><circle cx="14" cy="5.2" r="1.3"/></svg>PATTERNS</button>
   <button data-v="vGoals"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="3.1"/><circle cx="10" cy="10" r="0.6" fill="currentColor"/></svg>GOALS</button>
   <button data-v="vMealTrend" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15.5 7.4 10l3.3 3 5.3-7"/><path d="M12.8 6h3.2v3.2"/></svg>TRENDS</button>
-  <button data-v="vMealLink"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.3 11.7a3.2 3.2 0 0 0 4.6 0l2.3-2.3a3.2 3.2 0 0 0-4.6-4.6l-1 1"/><path d="M11.7 8.3a3.2 3.2 0 0 0-4.6 0l-2.3 2.3a3.2 3.2 0 0 0 4.6 4.6l1-1"/></svg>LINKS</button>
+  <button data-v="vMealLink" style="display:none"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.3 11.7a3.2 3.2 0 0 0 4.6 0l2.3-2.3a3.2 3.2 0 0 0-4.6-4.6l-1 1"/><path d="M11.7 8.3a3.2 3.2 0 0 0-4.6 0l-2.3 2.3a3.2 3.2 0 0 0 4.6 4.6l1-1"/></svg>LINKS</button>
 </div>
 <div id="navTrain" class="navbar" style="display:none">
   <button data-v="vVol" class="on"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 17h13.6"/><path d="M6 17V9.2M10 17V4.4M14 17v-6.2"/></svg>VOLUME</button>
@@ -963,11 +963,11 @@ main{flex:1;position:relative;overflow:hidden}
   <div class="eyebrow" style="margin-top:17px">SPREADSHEET</div>
   <button class="btn" id="mXlsxOut">EXPORT WORKBOOK &#183; .XLSX</button>
   <button class="btn" id="mXlsxIn">IMPORT WORKBOOK</button>
-  <p class="note">The workbook is the round trip. Export, edit in Excel, import back — rows match on ID so nothing duplicates.</p>
+  <p class="note">The round trip for the <b>schedule</b>. Export, edit in Excel, import back — rows match on ID so nothing duplicates. Alarms, training and nutrition are not in here; the snapshot below carries those.</p>
   <div class="eyebrow" style="margin-top:17px">BACKUP</div>
   <button class="btn" id="mJsonOut">SAVE SNAPSHOT &#183; .JSON</button>
   <button class="btn" id="mJsonIn">RESTORE SNAPSHOT</button>
-  <p class="note">One file covering all three apps — schedule, alarms and training. Restores everything exactly, streak history and physique assessments included.</p>
+  <p class="note">One file covering all four apps — schedule, alarms, training and meals. Restores everything exactly: streak history, physique assessments, check-ins and imported nutrition.</p>
   <div class="eyebrow" style="margin-top:17px">SETTINGS</div>
   <div class="fld"><label>DAY ROLLS OVER AT</label><input type="time" id="mRoll" value="04:00">
     <p class="note">A block before this hour counts toward the previous day, so a late night doesn't read as a miss.</p></div>
@@ -991,7 +991,7 @@ main{flex:1;position:relative;overflow:hidden}
 <div class="sheet" id="shRescue"><div class="grab"></div>
   <div class="sh"><b>BACK UP WITHOUT DOWNLOADING</b><button class="ico" id="rX">&#10005;</button></div>
   <p class="note" style="margin-bottom:11px">Android's download manager can't always handle files made in the page.
-    These routes avoid it entirely. Everything is included — schedule, alarms and training in one payload.</p>
+    These routes avoid it entirely. All four apps travel in one payload — schedule, alarms, training and meals.</p>
   <button class="btn pri" id="rCopy">COPY BACKUP TO CLIPBOARD</button>
   <p class="note">Then paste into an email to yourself, a note, or any cloud-synced document. That text
     is a complete restore.</p>
@@ -1883,7 +1883,7 @@ function openBlock(id){
     $("#blkTrain").onclick=()=>{ closeSheet(); TDATE=CUR; setApp("train"); go("vSess"); };
   }
   $("#blkHint").innerHTML = b.kind==="habit"
-    ? "Skipping on purpose holds the streak. Leaving it open past midnight breaks it."
+    ? "Skipping on purpose holds the streak. Leaving it open past the "+fmtT(S.cfg.roll)+" rollover breaks it."
     : b.kind==="fixture" ? "Fixtures are logged but never scored — no streak either way."
     : "Press and hold the block on the timeline to drag it; drag the bars to resize.";
   sheet("#shBlock");
@@ -2369,7 +2369,9 @@ async function exportXlsx(){
   const sheets=[
     {name:"README",rows:[
       ["SCHEDULE WORKBOOK"],[],
-      ["This file is the round trip. Export it, edit it, import it back."],
+      ["This workbook covers the SCHEDULE only. Alarms, training and nutrition"],
+      ["live in the JSON snapshot - use Back up without downloading for those."],[],
+      ["Export it, edit it, import it back."],
       ["Rows match on ID, so re-importing an edited sheet updates rather than duplicates."],
       ["Leave ID blank on a new row and one gets assigned on import."],[],
       ["SHEET","WHAT IT HOLDS"],
@@ -2638,12 +2640,18 @@ async function exportJson(){
 }
 async function importJson(file){
   const txt=await file.text(); const o=JSON.parse(txt);
-  if(!o||!o.items) throw new Error("Not a SCHEDULE snapshot");
-  ask("RESTORE SNAPSHOT","Replaces everything currently in the app with the contents of this file. Undo will still bring it back.",()=>{
-    mark(); S=o;
-    if(!S.cfg) S.cfg=JSON.parse(JSON.stringify(FRESH.cfg));
-    for(const k in FRESH.cfg) if(S.cfg[k]===undefined) S.cfg[k]=FRESH.cfg[k];
-    _earliest=null; commit(); toast("Restored","go");
+  if(!o||(!o.items&&!o.sched)) throw new Error("Not a snapshot from this app");
+  const c=bundleCounts(o);
+  ask("RESTORE SNAPSHOT","Replaces every app with: "+c.items+" items, "+c.days+" days, "+
+      c.alarms+" alarms, "+c.sessions+" sessions, "+c.ratings+" assessments, "+
+      c.meals+" nutrition days. Undo will still bring the old state back.",()=>{
+    mark();
+    if(!restoreBundle(o)) return toast("Could not read that snapshot","no");
+    commit();
+    if(typeof HUB!=="undefined"){
+      if(HUB==="alarm") drawAlarm(); else if(HUB==="train") drawTrain(); else if(HUB==="meal") drawMeal();
+    }
+    toast("Restored","go");
   });
 }
 
@@ -4005,7 +4013,7 @@ function drawPhys(){
   const px=l?proximity(l):null;
   $("#physHero").innerHTML = px
     ? `<div class="hero"><div class="num ${px.total>=80?"ok":px.total>=55?"mid":"lo"}">${Math.round(px.total)}</div>
-       <div class="txt"><b>PROXIMITY</b><i>${relDate(l.date)} &#183; harmony ${Math.round(px.harmony)}
+       <div class="txt"><b>PROXIMITY</b><i>${relDate(l.date)} &#183; alignment ${Math.round(px.harmony)}
        &#183; size ${Math.round(px.size)} &#183; ${px.lean!=null?"lean "+Math.round(px.lean):"lean unrated"}</i></div></div>`
     : `<div class="empty"><b>NOT RATED YET</b>One pass gives you a score. A second, ${T.cfg.rateEvery} days on,
        starts the comparison against your training numbers.</div>`;
@@ -4013,7 +4021,7 @@ function drawPhys(){
   if(px){
     const up=halfScore(l,"upper"), lw=halfScore(l,"lower"), gs=groupScores(l);
     $("#physScores").innerHTML=`<div class="diff">
-        <div><span>HARMONY &#183; 40%</span><b>${Math.round(px.harmony)}</b></div>
+        <div><span>ALIGNMENT &#183; 40%</span><b>${Math.round(px.harmony)}</b></div>
         <div><span>SIZE &#183; 30%</span><b>${Math.round(px.size)}</b></div>
         <div><span>LEANNESS &#183; 30%</span><b>${px.lean!=null?Math.round(px.lean):"—"}</b></div>
         <div><span>UPPER &#183; derived</span><b>${up!=null?Math.round(up):"—"}</b></div>
@@ -5547,6 +5555,25 @@ function drawPatterns(){
       : `<div class="empty"><b>NONE</b></div>`}
     <p class="note">Correlation only. A real effect and a coincidence look identical here — what separates
       them is whether it persists as the window grows.</p>
+
+    ${(()=>{const L=mealLinks(patWeeks);
+      if(!L) return "";
+      const dk=(L.kcalTrained!=null&&L.kcalRest!=null)?Math.round(L.kcalTrained-L.kcalRest):null;
+      const dp=(L.protTrained!=null&&L.protRest!=null)?Math.round(L.protTrained-L.protRest):null;
+      return `<div class="eyebrow" style="margin-top:17px">TRAINING DAYS VS REST DAYS</div>
+        <div class="diff">
+          <div><span>DAYS</span><b>${L.trained} trained / ${L.rest} rest</b></div>
+          <div><span>CALORIES</span><b>${L.kcalTrained!=null?Math.round(L.kcalTrained):"—"} vs ${L.kcalRest!=null?Math.round(L.kcalRest):"—"}</b></div>
+          ${dk!=null?`<div class="${Math.abs(dk)>150?"up":"ok"}"><span>DIFFERENCE</span><b>${dk>0?"+":""}${dk} kcal</b></div>`:""}
+          <div><span>PROTEIN</span><b>${L.protTrained!=null?Math.round(L.protTrained):"—"} vs ${L.protRest!=null?Math.round(L.protRest):"—"} g</b></div>
+          ${dp!=null?`<div class="${Math.abs(dp)>20?"up":"ok"}"><span>DIFFERENCE</span><b>${dp>0?"+":""}${dp} g</b></div>`:""}
+          ${L.perLb!=null?`<div><span>PROTEIN PER LB</span><b>${Math.round(L.perLb*100)/100} g</b></div>`:""}
+          ${L.hitProtein!=null?`<div><span>DAYS AT PROTEIN TARGET</span><b>${L.hitProtein} of ${L.days}</b></div>`:""}
+        </div>
+        <p class="note">${dk==null?"":Math.abs(dk)<100
+          ? "You eat about the same either way — deliberate if you're holding a flat surplus."
+          : (dk>0?"You eat more on training days.":"You eat less on training days, which is usually the wrong way round.")}</p>`;
+    })()}
 
     <div class="eyebrow" style="margin-top:17px">ROLLING AVERAGES</div>
     <div class="diff">${["kcal","protein","fat","netcarbs"].map(k=>{
