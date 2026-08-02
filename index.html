@@ -684,7 +684,7 @@ main{flex:1;position:relative;overflow:hidden}
       <div class="fld"><label>TARGET HIGH</label><input type="number" id="tHi" min="2" max="60" value="20"></div>
     </div>
     <div class="two">
-      <div class="fld"><label>BODYWEIGHT &#183; FALLBACK</label><input type="number" id="tBw" min="50" max="500" value="180"></div>
+      <div class="fld"><label>BODYWEIGHT &#183; FALLBACK</label><input type="number" id="tBw" min="50" max="500" step="0.1" value="180"></div>
       <div class="fld"><label>RATE EVERY (DAYS)</label><input type="number" id="tRate" min="7" max="60" value="14"></div>
     </div>
     <div class="two">
@@ -1043,8 +1043,8 @@ main{flex:1;position:relative;overflow:hidden}
     <div class="fld"><label>MORNING</label><input type="number" id="wgAM" inputmode="decimal" step="0.2" placeholder="lb"></div>
     <div class="fld"><label>NIGHT</label><input type="number" id="wgPM" inputmode="decimal" step="0.2" placeholder="lb"></div>
   </div>
-  <p class="note" style="margin-bottom:10px">Both optional. Whatever you log averages into a 7-day trend,
-    which is the number worth steering by — a single reading swings several pounds on water alone.</p>
+  <p class="note" style="margin-bottom:10px">The trend uses <b>morning only</b> — fasted, post-void, before
+    anything. Evening is worth logging for the swing it shows, but it is never averaged into the trend.</p>
   <button class="btn pri" id="wgSave">SAVE</button>
 </div>
 
@@ -3389,6 +3389,28 @@ async function tLoad(){
 }
 const exById=id=>T.ex.find(e=>e.id===id);
 
+/* ---------- which reading counts ----------
+   Morning weight is the series. Evening is logged but never averaged in:
+   fasted and post-void is the low-variance measurement, while an evening
+   reading carries whatever food and water is still aboard. Averaging the
+   two would make a day with an evening entry read heavier than one
+   without, and that offset is not random — it tracks whether you happened
+   to weigh in twice, which would feed a fake signal straight into the
+   trend the maintenance fit reads.
+   An evening-only day is still usable: it gets corrected by your own
+   measured am-to-pm offset rather than thrown away. */
+function pmOffset(){
+  const pairs=(T.bodylog||[]).filter(b=>b.am!=null&&b.pm!=null);
+  if(pairs.length<3) return null;
+  return pairs.reduce((a,b)=>a+(b.pm-b.am),0)/pairs.length;
+}
+function dayWeight(b){
+  if(!b) return null;
+  if(b.am!=null) return b.am;
+  if(b.pm!=null){ const o=pmOffset(); return o!=null? b.pm-o : null; }
+  return null;
+}
+
 /* ---------- bodyweight, as of a given date ----------
    Bodyweight lifts have to be scored with what you weighed on the day.
    Using one static figure would silently rewrite the load on every
@@ -3397,9 +3419,8 @@ function bodyweightOn(date){
   const log=T.bodylog||[];
   let before=null, after=null;
   for(const b of log){
-    const v=[b.am,b.pm].filter(x=>x!=null);
-    if(!v.length) continue;
-    const w=v.reduce((a,c)=>a+c,0)/v.length;
+    const w=dayWeight(b);
+    if(w==null) continue;
     if(b.date<=date) before=w;
     else if(after==null) after=w;
   }
@@ -3632,8 +3653,6 @@ function logWeight(date,am,pm){
   if(am!=null) r.am=am;
   if(pm!=null) r.pm=pm;
   T.bodylog.sort((a,b)=>a.date.localeCompare(b.date));
-  const cur=bodyweightOn(todayStr());
-  if(cur!=null) T.cfg.bodyweight=Math.round(cur*10)/10;   // fallback stays current
   tSave();
 }
 /* 7-day trend of the mean of whatever readings exist — daily weight is
@@ -3642,8 +3661,8 @@ function weightTrend(days){
   days=days||7;
   const out=[];
   for(const r of T.bodylog){
-    const v=[r.am,r.pm].filter(x=>x!=null);
-    if(v.length) out.push({date:r.date, w:v.reduce((a,b)=>a+b,0)/v.length});
+    const w=dayWeight(r);
+    if(w!=null) out.push({date:r.date, w});
   }
   if(!out.length) return null;
   const sm=out.map((p,i)=>{
@@ -4006,12 +4025,19 @@ function drawPhys(){
         <span class="tag">${Math.round(g.score)}</span></div>`).join("")}`;
   } else $("#physScores").innerHTML="";
 
-  const wt=weightTrend(7);
+  const wt=weightTrend(7), off=pmOffset();
+  const pairs=(T.bodylog||[]).filter(b=>b.am!=null&&b.pm!=null).length;
   $("#physWeight").innerHTML = wt
     ? `<div class="diff"><div><span>LATEST 7-DAY MEAN</span><b>${Math.round(wt.latest.avg*10)/10} ${T.cfg.unit}</b></div>
        <div class="${wt.change>0?"up":"ok"}"><span>CHANGE OVER LOG</span><b>${wt.change>0?"+":""}${Math.round(wt.change*10)/10} ${T.cfg.unit}</b></div>
-       <div><span>READINGS</span><b>${wt.points.length}</b></div></div>`
-    : `<div class="empty"><b>NO WEIGHTS LOGGED</b>Morning and night readings average into a 7-day trend.</div>`;
+       <div><span>MORNINGS USED</span><b>${wt.points.length}</b></div>
+       ${off!=null?`<div><span>EVENING RUNS</span><b>+${Math.round(off*10)/10} ${T.cfg.unit}</b></div>`:""}
+       </div>
+       <p class="note">The trend is morning weight only — fasted and post-void is the steady
+       measurement. Evening readings are kept${off!=null?` and, across ${pairs} paired days, run
+       ${Math.round(off*10)/10} ${T.cfg.unit} heavier; that offset is used to rescue a day where you
+       only weighed at night`:", and once there are a few paired days they'll be used to fill in any night-only day"}.</p>`
+    : `<div class="empty"><b>NO WEIGHTS LOGGED</b>Morning weight drives the trend. Log the evening too if you like — it is kept, never averaged in.</div>`;
 
   const dv=divergence(8);
   $("#physDiv").innerHTML = dv
@@ -4085,9 +4111,10 @@ function drawTrain(){
   else if(VIEW==="vPhys") drawPhys();
 }
 function syncTCfg(){
-  $("#tRest").value=T.cfg.restSec; $("#tBar").value=T.cfg.bar;
-  $("#tLo").value=T.cfg.targetLow; $("#tHi").value=T.cfg.targetHigh;
-  
+  $("#tRest").value=T.cfg.restSec;   $("#tBar").value=T.cfg.bar;
+  $("#tLo").value=T.cfg.targetLow;   $("#tHi").value=T.cfg.targetHigh;
+  $("#tBw").value=T.cfg.bodyweight;  $("#tRate").value=T.cfg.rateEvery;
+  $("#tBlack").value=T.cfg.blackout;
 }
 $$("#navTrain button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
 
@@ -4333,11 +4360,13 @@ $("#exSave").addEventListener("click",()=>{
 });
 
 /* ---------- settings ---------- */
-const bindT=(sel,key,lo,hi)=>$(sel).addEventListener("change",e=>{
-  T.cfg[key]=clamp(parseInt(e.target.value)||T.cfg[key],lo,hi); tSave(); drawTrain(); });
+const bindT=(sel,key,lo,hi,dec)=>$(sel).addEventListener("change",e=>{
+  const raw=dec?parseFloat(e.target.value):parseInt(e.target.value);
+  T.cfg[key]=clamp(isFinite(raw)?raw:T.cfg[key],lo,hi);
+  tSave(); drawTrain(); });
 bindT("#tRest","restSec",15,600); bindT("#tBar","bar",0,100);
 bindT("#tLo","targetLow",1,40); bindT("#tHi","targetHigh",2,60);
-bindT("#tBw","bodyweight",50,500); bindT("#tRate","rateEvery",7,60);
+bindT("#tBw","bodyweight",50,500,true); bindT("#tRate","rateEvery",7,60);
 bindT("#tBlack","blackout",0,10);
 $("#tExLib").addEventListener("click",()=>openPick("browse"));
 $("#restSkip").addEventListener("click",stopRest);
@@ -4797,10 +4826,9 @@ function mealLinks(weeks){
   };
   let wt=null;
   if(typeof T!=="undefined"&&T.bodylog&&T.bodylog.length>1){
-    const pts=T.bodylog.filter(b=>b.date>=cut).map(b=>{
-      const v=[b.am,b.pm].filter(x=>x!=null);
-      return v.length?{date:b.date,w:v.reduce((a,b)=>a+b,0)/v.length}:null;
-    }).filter(Boolean);
+    const pts=T.bodylog.filter(b=>b.date>=cut)
+      .map(b=>{ const w=dayWeight(b); return w!=null?{date:b.date,w}:null; })
+      .filter(Boolean);
     if(pts.length>1) wt={change:pts[pts.length-1].w-pts[0].w,n:pts.length,
                          first:pts[0].w,last:pts[pts.length-1].w};
   }
@@ -5125,17 +5153,16 @@ function goalGap(){
 function latestWeight(){
   if(typeof T==="undefined"||!T.bodylog||!T.bodylog.length) return null;
   for(let i=T.bodylog.length-1;i>=0;i--){
-    const b=T.bodylog[i], v=[b.am,b.pm].filter(x=>x!=null);
-    if(v.length) return v.reduce((a,b)=>a+b,0)/v.length;
+    const w=dayWeight(T.bodylog[i]);
+    if(w!=null) return w;
   }
   return null;
 }
 function weightSeries(fromDate){
   if(typeof T==="undefined"||!T.bodylog) return [];
-  return T.bodylog.filter(b=>!fromDate||b.date>=fromDate).map(b=>{
-    const v=[b.am,b.pm].filter(x=>x!=null);
-    return v.length?{date:b.date,w:v.reduce((a,b)=>a+b,0)/v.length}:null;
-  }).filter(Boolean);
+  return T.bodylog.filter(b=>!fromDate||b.date>=fromDate)
+    .map(b=>{ const w=dayWeight(b); return w!=null?{date:b.date,w}:null; })
+    .filter(Boolean);
 }
 
 /* ---------- maintenance calibration ----------
