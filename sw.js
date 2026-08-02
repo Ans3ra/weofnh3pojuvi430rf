@@ -1,5 +1,5 @@
 /* Bump CACHE when you replace index.html so the phone picks up the new version. */
-const CACHE = "hub-v25";
+const CACHE = "hub-v27";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 /* Cache each file independently. One missing file must NOT abort installation —
